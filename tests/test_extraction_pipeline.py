@@ -8,8 +8,8 @@ from tests.conftest import make_result
 SETTINGS = {
     "ocr": {
         "primary": "claude_vision",
-        "claude_model": "claude-haiku-4-5-20251001",
-        "anthropic_api_key_env": "ANTHROPIC_API_KEY",
+        "claude_model": "haiku",
+        "openclaw_scripts_dir_env": "OPENCLAW_SCRIPTS_DIR",
         "easyocr_languages": ["en"],
     }
 }

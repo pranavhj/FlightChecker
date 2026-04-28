@@ -1,68 +1,80 @@
-import base64
 import json
 import logging
 import os
+import re
+import subprocess
+import sys
+import tempfile
 from pathlib import Path
 from typing import Optional
 
 logger = logging.getLogger(__name__)
 
-_SYSTEM_PROMPT = """You are a flight data extractor. Given a screenshot of flight search results,
-extract the top flights visible and return a JSON array. Each element must have exactly these keys:
+_PROMPT = """\
+Use the Read tool to view the screenshot at: {image_path}
+
+Extract all visible flight results and return ONLY a JSON array. Each element must have exactly these keys:
   price_text, airline_text, duration_text, stops_text, dep_time_text, arr_time_text
 
-Use empty string "" for any field you cannot read clearly. Return ONLY the JSON array, no other text."""
+Use "" for any field you cannot read clearly. Raw JSON array only — no explanation, no markdown.
+"""
 
 
 class ClaudeVisionOCR:
     def __init__(self, settings: dict):
         ocr_cfg = settings.get("ocr", {})
-        self.model = ocr_cfg.get("claude_model", "claude-haiku-4-5-20251001")
-        api_key_env = ocr_cfg.get("anthropic_api_key_env", "ANTHROPIC_API_KEY")
-        self._api_key = os.environ.get(api_key_env)
-
-    def _client(self):
-        import anthropic
-        return anthropic.Anthropic(api_key=self._api_key)
+        scripts_env = ocr_cfg.get("openclaw_scripts_dir_env", "OPENCLAW_SCRIPTS_DIR")
+        scripts_dir = os.environ.get(scripts_env, "")
+        self._agent_smart = Path(scripts_dir) / "agent-smart.py" if scripts_dir else None
+        self._model = ocr_cfg.get("claude_model", "haiku")
 
     def extract(self, screenshot_path: str) -> Optional[list[dict]]:
-        if not self._api_key:
-            logger.warning("ANTHROPIC_API_KEY not set; skipping Claude OCR")
-            return None
         path = Path(screenshot_path)
         if not path.exists():
             return None
-        try:
-            with open(path, "rb") as f:
-                image_data = base64.standard_b64encode(f.read()).decode("utf-8")
-
-            client = self._client()
-            response = client.messages.create(
-                model=self.model,
-                max_tokens=2048,
-                system=_SYSTEM_PROMPT,
-                messages=[{
-                    "role": "user",
-                    "content": [
-                        {
-                            "type": "image",
-                            "source": {
-                                "type": "base64",
-                                "media_type": "image/png",
-                                "data": image_data,
-                            },
-                        },
-                        {"type": "text", "text": "Extract all flight results visible in this screenshot."},
-                    ],
-                }],
-            )
-            raw = response.content[0].text.strip()
-            # Strip ```json ... ``` wrapping if present
-            if raw.startswith("```"):
-                raw = raw.split("```")[1]
-                if raw.startswith("json"):
-                    raw = raw[4:]
-            return json.loads(raw.strip())
-        except Exception as e:
-            logger.warning("Claude OCR failed: %s", e)
+        if not self._agent_smart or not self._agent_smart.exists():
+            logger.warning("agent-smart.py not found; set OPENCLAW_SCRIPTS_DIR env var")
             return None
+
+        prompt = _PROMPT.format(image_path=str(path.resolve()))
+        prompt_file = None
+        try:
+            with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False, encoding='utf-8') as f:
+                f.write(prompt)
+                prompt_file = Path(f.name)
+
+            result = subprocess.run(
+                [sys.executable, str(self._agent_smart),
+                 '--permission-mode', 'bypassPermissions',
+                 '--model', self._model,
+                 '--print-file', str(prompt_file)],
+                capture_output=True,
+                text=True,
+                encoding='utf-8',
+                errors='replace',
+                timeout=60,
+            )
+            return _parse_json(result.stdout)
+        except Exception as e:
+            logger.warning("Claude delegation OCR failed: %s", e)
+            return None
+        finally:
+            if prompt_file:
+                try:
+                    prompt_file.unlink(missing_ok=True)
+                except Exception:
+                    pass
+
+
+def _parse_json(text: str) -> Optional[list[dict]]:
+    if '```' in text:
+        m = re.search(r'```(?:json)?\s*([\s\S]+?)```', text)
+        if m:
+            text = m.group(1).strip()
+    m = re.search(r'\[[\s\S]+\]', text)
+    if m:
+        try:
+            return json.loads(m.group(0))
+        except json.JSONDecodeError:
+            pass
+    return None
