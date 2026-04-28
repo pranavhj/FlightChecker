@@ -1,0 +1,63 @@
+# Flight Monitor Report — {{ run_date }} {{ run_time }} UTC
+**Time weight**: ${{ "%.2f"|format(time_weight) }}/hour | **Formula**: price + ({{ time_weight }} × hours)
+
+---
+{% for rr in route_results %}
+## Route: {{ rr.route.origin }} → {{ rr.route.destination }} ({{ "One-way" if rr.route.one_way else "Return" }}) — {{ rr.source | replace("_", " ") | title }}
+
+{% if rr.route.one_way %}
+### Results
+{% if rr.outbound_results %}
+| Rank | Date | Airline | Depart | Arrive | Duration | Stops | Price | Score | Method | Confidence |
+|------|------|---------|--------|--------|----------|-------|-------|-------|--------|------------|
+{% for r in rr.outbound_results %}| {{ loop.index }} | {{ r.depart_date }} | {{ r.airline_text or "—" }} | {{ r.dep_time_text or "—" }} | {{ r.arr_time_text or "—" }} | {{ r.duration_text or "—" }} | {{ r.stops_text or "—" }} | {{ r.price_text or "—" }} | {{ "%.2f"|format(r.score) if r.score is not none else "—" }} | {{ r.extraction_method }} | {{ r.confidence }} |
+{% endfor %}
+{% else %}
+_No results found._
+{% endif %}
+{% else %}
+### Outbound Leg ({{ rr.route.origin }} → {{ rr.route.destination }})
+{% if rr.outbound_results %}
+| Rank | Date | Airline | Depart | Arrive | Duration | Stops | Price | Score | Method | Confidence |
+|------|------|---------|--------|--------|----------|-------|-------|-------|--------|------------|
+{% for r in rr.outbound_results %}| {{ loop.index }} | {{ r.depart_date }} | {{ r.airline_text or "—" }} | {{ r.dep_time_text or "—" }} | {{ r.arr_time_text or "—" }} | {{ r.duration_text or "—" }} | {{ r.stops_text or "—" }} | {{ r.price_text or "—" }} | {{ "%.2f"|format(r.score) if r.score is not none else "—" }} | {{ r.extraction_method }} | {{ r.confidence }} |
+{% endfor %}
+{% else %}
+_No outbound results found._
+{% endif %}
+
+### Return Leg ({{ rr.route.destination }} → {{ rr.route.origin }})
+{% if rr.return_results %}
+| Rank | Date | Airline | Depart | Arrive | Duration | Stops | Price | Score | Method | Confidence |
+|------|------|---------|--------|--------|----------|-------|-------|-------|--------|------------|
+{% for r in rr.return_results %}| {{ loop.index }} | {{ r.depart_date }} | {{ r.airline_text or "—" }} | {{ r.dep_time_text or "—" }} | {{ r.arr_time_text or "—" }} | {{ r.duration_text or "—" }} | {{ r.stops_text or "—" }} | {{ r.price_text or "—" }} | {{ "%.2f"|format(r.score) if r.score is not none else "—" }} | {{ r.extraction_method }} | {{ r.confidence }} |
+{% endfor %}
+{% else %}
+_No return results found._
+{% endif %}
+
+{% if rr.best_pairings %}
+### Best Combinations (Outbound + Return)
+| Outbound Date | Outbound Airline | Return Date | Return Airline | Total Price | Combined Score |
+|---------------|-----------------|-------------|----------------|-------------|----------------|
+{% for p in rr.best_pairings %}| {{ p.outbound.depart_date }} | {{ p.outbound.airline_text or "—" }} (${{ "%.0f"|format(p.outbound.price_usd) if p.outbound.price_usd else "?" }}) | {{ p.ret.depart_date }} | {{ p.ret.airline_text or "—" }} (${{ "%.0f"|format(p.ret.price_usd) if p.ret.price_usd else "?" }}) | ${{ "%.0f"|format(p.total_price_usd) }} | {{ "%.2f"|format(p.combined_score) }} |
+{% endfor %}
+{% endif %}
+{% endif %}
+
+{% if rr.warnings %}
+**Warnings**: {{ rr.warnings | join("; ") }}
+{% endif %}
+
+---
+{% endfor %}
+{% if alerts %}
+## Price Alerts
+{% for a in alerts %}
+- **{{ a.route }} {{ a.leg }} {{ a.date }} ({{ a.source }})**: ${{ "%.0f"|format(a.current_price) }} ↓ from ${{ "%.0f"|format(a.prior_price) }} ({{ "%.1f"|format(a.delta_pct) }}%){% if a.prior_timestamp %} — previous run: {{ a.prior_timestamp[:16] | replace("T", " ") }}{% endif %}
+
+{% endfor %}
+{% else %}
+## Price Alerts
+_No significant price drops detected._
+{% endif %}

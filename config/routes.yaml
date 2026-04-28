@@ -1,0 +1,14 @@
+routes:
+  - origin: SJC
+    destination: LAS
+    one_way: false
+    outbound_window: { start: "2026-05-01", end: "2026-05-14" }
+    return_window:   { start: "2026-05-08", end: "2026-05-21" }
+
+  - origin: SJC
+    destination: ORD
+    one_way: false
+    outbound_window: { start: "2026-05-01", end: "2026-05-14" }
+    return_window:   { start: "2026-05-08", end: "2026-05-21" }
+
+top_n_results: 3
