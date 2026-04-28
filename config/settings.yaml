@@ -21,7 +21,6 @@ retries:
 ocr:
   primary: "claude_vision"
   claude_model: "haiku"
-  openclaw_scripts_dir_env: "OPENCLAW_SCRIPTS_DIR"
   easyocr_languages: ["en"]
 
 sources:

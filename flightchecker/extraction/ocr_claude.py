@@ -1,6 +1,5 @@
 import json
 import logging
-import os
 import re
 import subprocess
 import sys
@@ -20,12 +19,13 @@ Use "" for any field you cannot read clearly. Raw JSON array only — no explana
 """
 
 
+_SCRIPTS_DIR = Path(__file__).parent.parent.parent / "scripts"
+
+
 class ClaudeVisionOCR:
     def __init__(self, settings: dict):
         ocr_cfg = settings.get("ocr", {})
-        scripts_env = ocr_cfg.get("openclaw_scripts_dir_env", "OPENCLAW_SCRIPTS_DIR")
-        scripts_dir = os.environ.get(scripts_env, "")
-        self._agent_smart = Path(scripts_dir) / "agent-smart.py" if scripts_dir else None
+        self._agent_smart = _SCRIPTS_DIR / "agent-smart.py"
         self._model = ocr_cfg.get("claude_model", "haiku")
 
     def extract(self, screenshot_path: str) -> Optional[list[dict]]:
