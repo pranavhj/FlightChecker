@@ -1,5 +1,7 @@
 import logging
+from datetime import date as dobj
 from pathlib import Path
+from urllib.parse import quote_plus
 
 from playwright.async_api import BrowserContext
 
@@ -11,7 +13,6 @@ from flightchecker.utils.screenshot import screenshot_path
 logger = logging.getLogger(__name__)
 
 _S = SELECTORS["google_flights"]
-_BASE_URL = "https://www.google.com/travel/flights"
 
 
 class GoogleFlightsScraper(BaseScraper):
@@ -19,6 +20,12 @@ class GoogleFlightsScraper(BaseScraper):
 
     def __init__(self, context: BrowserContext, settings: dict):
         super().__init__(context, settings)
+
+    def _build_url(self, origin: str, destination: str, date: str) -> str:
+        d = dobj.fromisoformat(date)
+        # Natural-language query: Google Flights interprets this and shows results directly
+        q = f"one way flights from {origin} to {destination} {d.strftime('%B')} {d.day} {d.year}"
+        return f"https://www.google.com/travel/flights?q={quote_plus(q)}"
 
     async def search(
         self,
@@ -37,27 +44,29 @@ class GoogleFlightsScraper(BaseScraper):
         else:
             origin, destination = route.origin, route.destination
 
+        url = self._build_url(origin, destination, depart_date)
         page = await self.new_page()
         screenshots: list[str] = []
         raw_rows: list[dict] = []
 
         try:
-            await page.goto(_BASE_URL, wait_until="domcontentloaded", timeout=30_000)
-            await self.human_pause(1000, 2000)
-
-            await self._fill_form(page, origin, destination, depart_date)
-            await self.human_pause(2000, 3500)
-
-            # Wait for results
+            logger.info("GoogleFlights navigating to: %s", url)
+            await page.goto(url, wait_until="commit", timeout=15_000)
             try:
-                await page.wait_for_load_state("networkidle", timeout=15_000)
+                await page.wait_for_load_state("domcontentloaded", timeout=12_000)
             except Exception:
                 pass
+            await self.human_pause(2000, 3500)
+
+            # Wait for flight result cards to appear
+            try:
+                await page.wait_for_selector(_S["card"][0], timeout=15_000)
+            except Exception:
+                logger.warning("GoogleFlights: timed out waiting for result cards")
 
             await self.scroll_into_results(page)
             await self.human_pause(800, 1500)
 
-            # Screenshot results
             ss_path = screenshot_path(
                 self._screenshots_dir, run_date, self.SOURCE,
                 origin, destination, depart_date, leg, "results"
@@ -69,80 +78,11 @@ class GoogleFlightsScraper(BaseScraper):
             raw_rows = await self._extract_cards(page, origin, destination, depart_date, leg, top_n, shot)
 
         except Exception as e:
-            logger.error("GoogleFlights search failed [%s→%s %s %s]: %s", origin, destination, depart_date, leg, e)
+            logger.error("GoogleFlights search failed [%s->%s %s %s]: %s", origin, destination, depart_date, leg, e)
         finally:
             await page.close()
 
         return raw_rows, screenshots
-
-    async def _fill_form(self, page, origin: str, destination: str, date: str) -> None:
-        # Set one-way trip
-        try:
-            trip_type = await page.query_selector('[data-value="2"]')
-            if trip_type:
-                await trip_type.click()
-                await self.human_pause(300, 600)
-        except Exception:
-            pass
-
-        # Clear and fill origin
-        try:
-            origin_input = await page.query_selector('input[aria-label*="Where from"]')
-            if not origin_input:
-                origin_input = await page.query_selector('input[placeholder*="Where from"]')
-            if origin_input:
-                await origin_input.triple_click()
-                await origin_input.type(origin, delay=80)
-                await self.human_pause(600, 1000)
-                await page.keyboard.press("ArrowDown")
-                await page.keyboard.press("Enter")
-                await self.human_pause(400, 700)
-        except Exception as e:
-            logger.warning("Could not fill origin: %s", e)
-
-        # Fill destination
-        try:
-            dest_input = await page.query_selector('input[aria-label*="Where to"]')
-            if not dest_input:
-                dest_input = await page.query_selector('input[placeholder*="Where to"]')
-            if dest_input:
-                await dest_input.triple_click()
-                await dest_input.type(destination, delay=80)
-                await self.human_pause(600, 1000)
-                await page.keyboard.press("ArrowDown")
-                await page.keyboard.press("Enter")
-                await self.human_pause(400, 700)
-        except Exception as e:
-            logger.warning("Could not fill destination: %s", e)
-
-        # Fill date — click the departure date field
-        try:
-            date_btn = await page.query_selector('[aria-label*="Departure"]')
-            if date_btn:
-                await date_btn.click()
-                await self.human_pause(500, 900)
-                # Type date in MM/DD/YYYY format
-                from datetime import date as dobj
-                d = dobj.fromisoformat(date)
-                formatted = d.strftime("%m/%d/%Y")
-                date_input = await page.query_selector('input[placeholder="MM/DD/YYYY"]')
-                if date_input:
-                    await date_input.fill(formatted)
-                    await self.human_pause(300, 500)
-                    await page.keyboard.press("Enter")
-        except Exception as e:
-            logger.warning("Could not fill date: %s", e)
-
-        # Submit search
-        try:
-            await self.human_pause(500, 800)
-            search_btn = await page.query_selector('[aria-label="Search"]')
-            if search_btn:
-                await search_btn.click()
-            else:
-                await page.keyboard.press("Enter")
-        except Exception as e:
-            logger.warning("Could not click search: %s", e)
 
     async def _extract_cards(
         self,

@@ -3,7 +3,7 @@
 
 ---
 {% for rr in route_results %}
-## Route: {{ rr.route.origin }} → {{ rr.route.destination }} ({{ "One-way" if rr.route.one_way else "Return" }}) — {{ rr.source | replace("_", " ") | title }}
+## Route: {{ rr.route.origin }} -> {{ rr.route.destination }} ({{ "One-way" if rr.route.one_way else "Return" }}) — {{ rr.source | replace("_", " ") | title }}
 
 {% if rr.route.one_way %}
 ### Results
@@ -16,7 +16,7 @@
 _No results found._
 {% endif %}
 {% else %}
-### Outbound Leg ({{ rr.route.origin }} → {{ rr.route.destination }})
+### Outbound Leg ({{ rr.route.origin }} -> {{ rr.route.destination }})
 {% if rr.outbound_results %}
 | Rank | Date | Airline | Depart | Arrive | Duration | Stops | Price | Score | Method | Confidence |
 |------|------|---------|--------|--------|----------|-------|-------|-------|--------|------------|
@@ -26,7 +26,7 @@ _No results found._
 _No outbound results found._
 {% endif %}
 
-### Return Leg ({{ rr.route.destination }} → {{ rr.route.origin }})
+### Return Leg ({{ rr.route.destination }} -> {{ rr.route.origin }})
 {% if rr.return_results %}
 | Rank | Date | Airline | Depart | Arrive | Duration | Stops | Price | Score | Method | Confidence |
 |------|------|---------|--------|--------|----------|-------|-------|-------|--------|------------|
@@ -54,7 +54,7 @@ _No return results found._
 {% if alerts %}
 ## Price Alerts
 {% for a in alerts %}
-- **{{ a.route }} {{ a.leg }} {{ a.date }} ({{ a.source }})**: ${{ "%.0f"|format(a.current_price) }} ↓ from ${{ "%.0f"|format(a.prior_price) }} ({{ "%.1f"|format(a.delta_pct) }}%){% if a.prior_timestamp %} — previous run: {{ a.prior_timestamp[:16] | replace("T", " ") }}{% endif %}
+- **{{ a.route }} {{ a.leg }} {{ a.date }} ({{ a.source }})**: ${{ "%.0f"|format(a.current_price) }} v from ${{ "%.0f"|format(a.prior_price) }} ({{ "%.1f"|format(a.delta_pct) }}%){% if a.prior_timestamp %} — previous run: {{ a.prior_timestamp[:16] | replace("T", " ") }}{% endif %}
 
 {% endfor %}
 {% else %}

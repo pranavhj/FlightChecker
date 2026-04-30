@@ -36,5 +36,5 @@ class Reporter:
         )
 
         report_path.parent.mkdir(parents=True, exist_ok=True)
-        report_path.write_text(content)
+        report_path.write_text(content, encoding="utf-8")
         logger.info("Report written to %s", report_path)

@@ -47,11 +47,25 @@ def combine_legs(
     outbound: list[FlightResult],
     returns: list[FlightResult],
     top_n: int,
+    nonstop_only: bool = False,
+    same_day_return: bool = False,
 ) -> list[LegPairing]:
     """Cartesian product of outbound × return legs ranked by combined score."""
     pairings = []
     for o in outbound:
+        # Apply nonstop filter for outbound
+        if nonstop_only and o.stops_text and "nonstop" not in o.stops_text.lower():
+            continue
+
         for r in returns:
+            # Apply nonstop filter for return
+            if nonstop_only and r.stops_text and "nonstop" not in r.stops_text.lower():
+                continue
+
+            # Apply same-day return filter
+            if same_day_return and o.depart_date != r.depart_date:
+                continue
+
             if o.price_usd is None or r.price_usd is None:
                 continue
             total_price = o.price_usd + r.price_usd

@@ -43,6 +43,15 @@ class DailyRunner:
                 slow_mo=slow_mo,
                 user_agent=ua or None,
                 accept_downloads=False,
+                args=[
+                    "--disable-blink-features=AutomationControlled",
+                    "--no-sandbox",
+                    "--disable-dev-shm-usage",
+                ],
+            )
+            # Mask navigator.webdriver to avoid bot detection
+            await context.add_init_script(
+                "Object.defineProperty(navigator, 'webdriver', {get: () => undefined})"
             )
 
             for route in self.routes:
@@ -77,6 +86,13 @@ class DailyRunner:
         outbound_ranked = rank_results(outbound_all, time_weight, self.top_n)
         outbound_processed = self._pipeline.process(outbound_ranked)
 
+        # Apply nonstop filter if requested
+        if route.nonstop_only:
+            outbound_processed = [
+                r for r in outbound_processed
+                if r.stops_text and "nonstop" in r.stops_text.lower()
+            ]
+
         return_ranked = []
         if not route.one_way and route.return_window:
             return_all = []
@@ -87,9 +103,22 @@ class DailyRunner:
             return_ranked = rank_results(return_all, time_weight, self.top_n)
             return_ranked = self._pipeline.process(return_ranked)
 
+            # Apply nonstop filter if requested
+            if route.nonstop_only:
+                return_ranked = [
+                    r for r in return_ranked
+                    if r.stops_text and "nonstop" in r.stops_text.lower()
+                ]
+
         pairings = []
         if outbound_processed and return_ranked:
-            pairings = combine_legs(outbound_processed, return_ranked, self.top_n)
+            pairings = combine_legs(
+                outbound_processed,
+                return_ranked,
+                self.top_n,
+                nonstop_only=route.nonstop_only,
+                same_day_return=route.same_day_return,
+            )
 
         return RouteRunResult(
             route=route,

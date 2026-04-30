@@ -47,7 +47,7 @@ class SkyscannerScraper(BaseScraper):
         results: list[FlightResult] = []
 
         try:
-            await page.goto(url, wait_until="domcontentloaded", timeout=30_000)
+            await page.goto(url, wait_until="commit", timeout=15_000)
             await self.human_pause(1500, 2500)
 
             await self._dismiss_consent(page)

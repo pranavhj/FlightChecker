@@ -59,7 +59,7 @@ def _run_once(config_dir: Path, date_override: str | None = None) -> None:
     reporter.render(route_results, alerts, report_path, run_date, run_time, settings)
 
     manual_review = [
-        f"{r.source}/{r.origin}→{r.destination}/{r.leg}/{r.depart_date}"
+        f"{r.source}/{r.origin}->{r.destination}/{r.leg}/{r.depart_date}"
         for rr in route_results
         for r in (rr.outbound_results + rr.return_results)
         if r.confidence == "manual_review"
@@ -104,7 +104,7 @@ def main() -> None:
         print(f"Config OK — {len(routes)} routes, top_n={top_n}")
         for r in routes:
             trip = "one-way" if r.one_way else "return"
-            print(f"  {r.origin}→{r.destination} ({trip})")
+            print(f"  {r.origin}->{r.destination} ({trip})")
         sys.exit(0)
 
     if args.once:

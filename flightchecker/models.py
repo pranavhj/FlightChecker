@@ -30,6 +30,8 @@ class RouteConfig:
     one_way: bool
     outbound_window: dict   # {"start": "YYYY-MM-DD", "end": "YYYY-MM-DD"}
     return_window: Optional[dict] = None  # only set when one_way=False
+    nonstop_only: bool = False
+    same_day_return: bool = False  # only valid for return trips
 
 
 @dataclass
