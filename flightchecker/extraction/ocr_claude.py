@@ -13,7 +13,7 @@ _PROMPT = """\
 Use the Read tool to view the screenshot at: {image_path}
 
 Extract all visible flight results and return ONLY a JSON array. Each element must have exactly these keys:
-  price_text, airline_text, duration_text, stops_text, dep_time_text, arr_time_text
+  price_text, airline_text, duration_text, stops_text, dep_time_text, arr_time_text, baggage_text
 
 Use "" for any field you cannot read clearly. Raw JSON array only — no explanation, no markdown.
 """

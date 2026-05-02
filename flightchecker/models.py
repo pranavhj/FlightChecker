@@ -15,12 +15,14 @@ class FlightResult:
     airline_text: str     # "United"
     dep_time_text: str    # "6:00 AM"
     arr_time_text: str    # "8:15 AM"
+    baggage_text: str     # "Free carry-on, Checked bag $30"
     confidence: str       # "high" | "medium" | "low" | "manual_review"
     screenshot_path: str
     extraction_method: str  # "dom" | "ocr_claude" | "ocr_easyocr" | "manual_review"
     price_usd: Optional[float] = None
     total_hours: Optional[float] = None
     score: Optional[float] = None
+    search_url: str = ""  # URL to the search results page for this leg
 
 
 @dataclass

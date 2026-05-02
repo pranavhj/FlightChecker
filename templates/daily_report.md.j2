@@ -8,9 +8,9 @@
 {% if rr.route.one_way %}
 ### Results
 {% if rr.outbound_results %}
-| Rank | Date | Airline | Depart | Arrive | Duration | Stops | Price | Score | Method | Confidence |
-|------|------|---------|--------|--------|----------|-------|-------|-------|--------|------------|
-{% for r in rr.outbound_results %}| {{ loop.index }} | {{ r.depart_date }} | {{ r.airline_text or "—" }} | {{ r.dep_time_text or "—" }} | {{ r.arr_time_text or "—" }} | {{ r.duration_text or "—" }} | {{ r.stops_text or "—" }} | {{ r.price_text or "—" }} | {{ "%.2f"|format(r.score) if r.score is not none else "—" }} | {{ r.extraction_method }} | {{ r.confidence }} |
+| Rank | Date | Airline | Depart | Arrive | Duration | Stops | Price | Baggage | Score | Method | Confidence | Link |
+|------|------|---------|--------|--------|----------|-------|-------|---------|-------|--------|------------|------|
+{% for r in rr.outbound_results %}| {{ loop.index }} | {{ r.depart_date }} | {{ r.airline_text or "—" }} | {{ r.dep_time_text or "—" }} | {{ r.arr_time_text or "—" }} | {{ r.duration_text or "—" }} | {{ r.stops_text or "—" }} | {{ r.price_text or "—" }} | {{ r.baggage_text or "—" }} | {{ "%.2f"|format(r.score) if r.score is not none else "—" }} | {{ r.extraction_method }} | {{ r.confidence }} | {% if r.search_url %}[Search]({{ r.search_url }}){% else %}—{% endif %} |
 {% endfor %}
 {% else %}
 _No results found._
@@ -18,9 +18,9 @@ _No results found._
 {% else %}
 ### Outbound Leg ({{ rr.route.origin }} -> {{ rr.route.destination }})
 {% if rr.outbound_results %}
-| Rank | Date | Airline | Depart | Arrive | Duration | Stops | Price | Score | Method | Confidence |
-|------|------|---------|--------|--------|----------|-------|-------|-------|--------|------------|
-{% for r in rr.outbound_results %}| {{ loop.index }} | {{ r.depart_date }} | {{ r.airline_text or "—" }} | {{ r.dep_time_text or "—" }} | {{ r.arr_time_text or "—" }} | {{ r.duration_text or "—" }} | {{ r.stops_text or "—" }} | {{ r.price_text or "—" }} | {{ "%.2f"|format(r.score) if r.score is not none else "—" }} | {{ r.extraction_method }} | {{ r.confidence }} |
+| Rank | Date | Airline | Depart | Arrive | Duration | Stops | Price | Baggage | Score | Method | Confidence | Link |
+|------|------|---------|--------|--------|----------|-------|-------|---------|-------|--------|------------|------|
+{% for r in rr.outbound_results %}| {{ loop.index }} | {{ r.depart_date }} | {{ r.airline_text or "—" }} | {{ r.dep_time_text or "—" }} | {{ r.arr_time_text or "—" }} | {{ r.duration_text or "—" }} | {{ r.stops_text or "—" }} | {{ r.price_text or "—" }} | {{ r.baggage_text or "—" }} | {{ "%.2f"|format(r.score) if r.score is not none else "—" }} | {{ r.extraction_method }} | {{ r.confidence }} | {% if r.search_url %}[Search]({{ r.search_url }}){% else %}—{% endif %} |
 {% endfor %}
 {% else %}
 _No outbound results found._
@@ -28,9 +28,9 @@ _No outbound results found._
 
 ### Return Leg ({{ rr.route.destination }} -> {{ rr.route.origin }})
 {% if rr.return_results %}
-| Rank | Date | Airline | Depart | Arrive | Duration | Stops | Price | Score | Method | Confidence |
-|------|------|---------|--------|--------|----------|-------|-------|-------|--------|------------|
-{% for r in rr.return_results %}| {{ loop.index }} | {{ r.depart_date }} | {{ r.airline_text or "—" }} | {{ r.dep_time_text or "—" }} | {{ r.arr_time_text or "—" }} | {{ r.duration_text or "—" }} | {{ r.stops_text or "—" }} | {{ r.price_text or "—" }} | {{ "%.2f"|format(r.score) if r.score is not none else "—" }} | {{ r.extraction_method }} | {{ r.confidence }} |
+| Rank | Date | Airline | Depart | Arrive | Duration | Stops | Price | Baggage | Score | Method | Confidence | Link |
+|------|------|---------|--------|--------|----------|-------|-------|---------|-------|--------|------------|------|
+{% for r in rr.return_results %}| {{ loop.index }} | {{ r.depart_date }} | {{ r.airline_text or "—" }} | {{ r.dep_time_text or "—" }} | {{ r.arr_time_text or "—" }} | {{ r.duration_text or "—" }} | {{ r.stops_text or "—" }} | {{ r.price_text or "—" }} | {{ r.baggage_text or "—" }} | {{ "%.2f"|format(r.score) if r.score is not none else "—" }} | {{ r.extraction_method }} | {{ r.confidence }} | {% if r.search_url %}[Search]({{ r.search_url }}){% else %}—{% endif %} |
 {% endfor %}
 {% else %}
 _No return results found._
@@ -38,9 +38,9 @@ _No return results found._
 
 {% if rr.best_pairings %}
 ### Best Combinations (Outbound + Return)
-| Outbound Date | Outbound Airline | Return Date | Return Airline | Total Price | Combined Score |
-|---------------|-----------------|-------------|----------------|-------------|----------------|
-{% for p in rr.best_pairings %}| {{ p.outbound.depart_date }} | {{ p.outbound.airline_text or "—" }} (${{ "%.0f"|format(p.outbound.price_usd) if p.outbound.price_usd else "?" }}) | {{ p.ret.depart_date }} | {{ p.ret.airline_text or "—" }} (${{ "%.0f"|format(p.ret.price_usd) if p.ret.price_usd else "?" }}) | ${{ "%.0f"|format(p.total_price_usd) }} | {{ "%.2f"|format(p.combined_score) }} |
+| Outbound Date | Outbound Airline | Return Date | Return Airline | Total Price | Combined Score | Search |
+|---------------|-----------------|-------------|----------------|-------------|----------------|--------|
+{% for p in rr.best_pairings %}| {{ p.outbound.depart_date }} | {{ p.outbound.airline_text or "—" }} (${{ "%.0f"|format(p.outbound.price_usd) if p.outbound.price_usd else "?" }}) | {{ p.ret.depart_date }} | {{ p.ret.airline_text or "—" }} (${{ "%.0f"|format(p.ret.price_usd) if p.ret.price_usd else "?" }}) | ${{ "%.0f"|format(p.total_price_usd) }} | {{ "%.2f"|format(p.combined_score) }} | {% if p.outbound.search_url %}[Out]({{ p.outbound.search_url }}){% endif %}{% if p.outbound.search_url and p.ret.search_url %} · {% endif %}{% if p.ret.search_url %}[Ret]({{ p.ret.search_url }}){% endif %} |
 {% endfor %}
 {% endif %}
 {% endif %}

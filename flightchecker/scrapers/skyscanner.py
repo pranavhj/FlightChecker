@@ -113,6 +113,7 @@ class SkyscannerScraper(BaseScraper):
             stops_text = await self.get_text(card, _S["stops"])
             dep_time_text = await self.get_text(card, _S["dep_time"])
             arr_time_text = await self.get_text(card, _S["arr_time"])
+            baggage_text = await self.get_text(card, _S.get("baggage", []))
 
             all_present = all([price_text, airline_text, duration_text, dep_time_text])
             confidence = "high" if all_present else "low"
@@ -130,6 +131,7 @@ class SkyscannerScraper(BaseScraper):
                 airline_text=airline_text,
                 dep_time_text=dep_time_text,
                 arr_time_text=arr_time_text,
+                baggage_text=baggage_text,
                 confidence=confidence,
                 screenshot_path=screenshot,
                 extraction_method=method,

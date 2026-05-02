@@ -27,6 +27,7 @@ def _dict_to_result(d: dict, template: FlightResult, method: str, confidence: st
         airline_text=d.get("airline_text", ""),
         dep_time_text=d.get("dep_time_text", ""),
         arr_time_text=d.get("arr_time_text", ""),
+        baggage_text=d.get("baggage_text", ""),
         confidence=confidence,
         screenshot_path=template.screenshot_path,
         extraction_method=method,

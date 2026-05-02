@@ -44,6 +44,7 @@ class EasyOCRExtractor:
                     "stops_text": "",
                     "dep_time_text": times[i * 2] if i * 2 < len(times) else "",
                     "arr_time_text": times[i * 2 + 1] if i * 2 + 1 < len(times) else "",
+                    "baggage_text": "",  # easyocr can't reliably parse baggage policies
                 })
             return results if results else None
         except Exception as e:

@@ -29,6 +29,14 @@ SELECTORS: dict[str, dict[str, list[str]]] = {
             ".Ir0Voe .sSHqwe span[aria-label]",
             ".h1fkLb span[aria-label]",
             ".sSHqwe span[aria-label]",
+            ".h1fkLb",  # fallback: try to get airline from container
+        ],
+        # Baggage information
+        "baggage": [
+            ".Pp6agd",
+            "[data-testid*='baggage']",
+            ".dHhQ6d",
+            ".h1fkLb .fH4h2c",
         ],
         # Duration
         "duration": [
@@ -72,6 +80,11 @@ SELECTORS: dict[str, dict[str, list[str]]] = {
             "[class*='LogoImage'] img[alt]",
             "[data-testid='carrier-name']",
             "[class*='Carriers__name']",
+        ],
+        "baggage": [
+            "[data-testid*='baggage']",
+            "[class*='BaggagePolicy']",
+            "[class*='baggage-info']",
         ],
         "duration": [
             "[class*='Duration__duration']",

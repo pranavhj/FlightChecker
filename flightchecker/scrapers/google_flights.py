@@ -76,6 +76,8 @@ class GoogleFlightsScraper(BaseScraper):
                 screenshots.append(shot)
 
             raw_rows = await self._extract_cards(page, origin, destination, depart_date, leg, top_n, shot)
+            for r in raw_rows:
+                r.search_url = url
 
         except Exception as e:
             logger.error("GoogleFlights search failed [%s->%s %s %s]: %s", origin, destination, depart_date, leg, e)
@@ -103,6 +105,7 @@ class GoogleFlightsScraper(BaseScraper):
             stops_text = await self.get_text(card, _S["stops"])
             dep_time_text = await self.get_text(card, _S["dep_time"])
             arr_time_text = await self.get_text(card, _S["arr_time"])
+            baggage_text = await self.get_text(card, _S.get("baggage", []))
 
             all_present = all([price_text, airline_text, duration_text, dep_time_text])
             confidence = "high" if all_present else "low"
@@ -120,6 +123,7 @@ class GoogleFlightsScraper(BaseScraper):
                 airline_text=airline_text,
                 dep_time_text=dep_time_text,
                 arr_time_text=arr_time_text,
+                baggage_text=baggage_text,
                 confidence=confidence,
                 screenshot_path=screenshot,
                 extraction_method=method,
