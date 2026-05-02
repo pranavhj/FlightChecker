@@ -25,18 +25,16 @@ SELECTORS: dict[str, dict[str, list[str]]] = {
         ],
         # Airline name
         "airline": [
-            ".h1fkLb .sSHqwe span[aria-label]",
+            ".h1fkLb span",
+            ".h1fkLb",
+            ".sSHqwe span",
             ".Ir0Voe .sSHqwe span[aria-label]",
-            ".h1fkLb span[aria-label]",
-            ".sSHqwe span[aria-label]",
-            ".h1fkLb",  # fallback: try to get airline from container
         ],
-        # Baggage information
+        # Baggage information (via aria-label on button showing "X carry-on bags included. Y checked bags included.")
         "baggage": [
-            ".Pp6agd",
-            "[data-testid*='baggage']",
-            ".dHhQ6d",
-            ".h1fkLb .fH4h2c",
+            "[aria-label*='carry-on bags included']",
+            "[aria-label*='baggage']",
+            "[aria-haspopup='dialog'][aria-label*='included']",
         ],
         # Duration
         "duration": [

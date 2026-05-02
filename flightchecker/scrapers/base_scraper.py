@@ -62,3 +62,24 @@ class BaseScraper:
             except Exception:
                 continue
         return ""
+
+    async def get_text_or_aria_label(self, element, selectors: list[str]) -> str:
+        """Try selectors within an element, return first non-empty text or aria-label."""
+        for sel in selectors:
+            try:
+                el = await element.query_selector(sel)
+                if el:
+                    # Try aria-label first
+                    aria_label = await el.get_attribute("aria-label")
+                    if aria_label:
+                        aria_label = aria_label.strip()
+                        if aria_label:
+                            return aria_label
+                    # Fallback to inner_text
+                    text = await el.inner_text()
+                    text = text.strip()
+                    if text:
+                        return text
+            except Exception:
+                continue
+        return ""

@@ -1,8 +1,8 @@
 # FlightChecker
 
 ## State
-Currently: Enhanced extraction with flight company & baggage info (2026-05-01)
-Last session: 2026-05-01
+Currently: DOM selectors refined for Google Flights — airline names & baggage info now extracted correctly (2026-05-02)
+Last session: 2026-05-02
 
 ## Done
 - Cloned repo, fixed Playwright API, encoding, pointer events, logging
@@ -22,23 +22,26 @@ Last session: 2026-05-01
 - **Updated OCR (Claude & easyocr) extractors to include baggage_text**
 - **Updated report template to display baggage information in all result tables**
 
-## Latest run results (2026-04-29_2348)
-SJC→LAS (May 10): $69 nonstop (best), $326 x2
-LAS→SJC (May 15): $69 nonstop (best), $214 x2
-Best combo: $138 total ($69 + $69)
+## Latest run results (2026-05-02_0323)
+SJC→ORD: Best combo $365 (outbound $151 + return $214)
+SFO→ORD: Best combo $333 (outbound $119 + return $214)
+Price Alert: SFO→ORD outbound $119 (↓42.5% from $207)
 
-## Routes configured
-- SJC→ORD (Chicago): June 13-29 (outbound), June 14-30 (return) — nonstop only
-- SFO→ORD (Chicago): June 13-29 (outbound), June 14-30 (return) — nonstop only
+## Routes configured (active)
+- SJC→ORD: June 13 (out), June 14 (ret) — nonstop only
+- SFO→ORD: June 13 (out), June 14 (ret) — nonstop only
+
+## Latest run results (2026-05-02_2313)
+SJC→ORD: Best combo $385 (outbound $151 + return $234)
+SFO→ORD: Best combo $333 (outbound $119 + return $214)
 
 ## Known issues
-- Airline name selector picks up airport code (SJC/LAS) instead of airline — data present but selector wrong
 - Depart/arrive times have extra newlines (cosmetic only)
 - Price alerts fired due to comparison with stale previous-run prices
 
 ## Next
-- Fix airline name selector in selector_registry.py to properly extract airline names
-- Test full SJC/SFO→Chicago search with new baggage extraction
+- Consider OCR fallback for baggage extraction if DOM selectors miss data (fallback available)
+- Monitor selector changes on Google Flights and update as needed
 
 ## Key decisions
 - PYTHONIOENCODING=utf-8 required on Windows

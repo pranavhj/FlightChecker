@@ -1,11 +1,16 @@
 routes:
   - origin: SJC
-    destination: LAS
+    destination: ORD
     one_way: false
-    outbound_window: { start: "2026-05-10", end: "2026-05-10" }
-    return_window:   { start: "2026-05-15", end: "2026-05-15" }
-    # Optional filters:
-    # nonstop_only: true          # Only include nonstop flights
-    # same_day_return: true       # Only show pairings where return date = outbound date
+    outbound_window: { start: "2026-06-13", end: "2026-06-13" }
+    return_window:   { start: "2026-06-14", end: "2026-06-14" }
+    nonstop_only: true
+
+  - origin: SFO
+    destination: ORD
+    one_way: false
+    outbound_window: { start: "2026-06-13", end: "2026-06-13" }
+    return_window:   { start: "2026-06-14", end: "2026-06-14" }
+    nonstop_only: true
 
 top_n_results: 3

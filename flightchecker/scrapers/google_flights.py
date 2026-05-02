@@ -1,4 +1,5 @@
 import logging
+import re
 from datetime import date as dobj
 from pathlib import Path
 from urllib.parse import quote_plus
@@ -11,6 +12,17 @@ from flightchecker.scrapers.selector_registry import SELECTORS
 from flightchecker.utils.screenshot import screenshot_path
 
 logger = logging.getLogger(__name__)
+
+
+def _simplify_baggage_text(text: str) -> str:
+    """Extract simple baggage info from aria-label (e.g. '1 carry-on bag included. 0 checked bags included.')"""
+    if not text:
+        return ""
+    # Try to extract baggage-related portion
+    match = re.search(r"(\d+\s+(?:carry-on|checked)\s+bags?\s+included[^.]*\.(?:\s*\d+\s+(?:carry-on|checked)\s+bags?\s+included[^.]*\.)?)", text, re.IGNORECASE)
+    if match:
+        return match.group(1).strip()
+    return text
 
 _S = SELECTORS["google_flights"]
 
@@ -105,7 +117,9 @@ class GoogleFlightsScraper(BaseScraper):
             stops_text = await self.get_text(card, _S["stops"])
             dep_time_text = await self.get_text(card, _S["dep_time"])
             arr_time_text = await self.get_text(card, _S["arr_time"])
-            baggage_text = await self.get_text(card, _S.get("baggage", []))
+            # Use aria-label for baggage since the info is in the button's aria-label attribute
+            baggage_raw = await self.get_text_or_aria_label(card, _S.get("baggage", []))
+            baggage_text = _simplify_baggage_text(baggage_raw)
 
             all_present = all([price_text, airline_text, duration_text, dep_time_text])
             confidence = "high" if all_present else "low"
