@@ -79,6 +79,8 @@ class DailyRunner:
         # Collect outbound results across all dates in window
         outbound_all = []
         out_dates = date_range(route.outbound_window)
+        logger.info("Starting %s->%s via %s: %d outbound dates",
+                    route.origin, route.destination, source_name, len(out_dates))
         for d in out_dates:
             results, _ = await self._search_with_retry(scraper, route, d, "outbound", warnings)
             outbound_all.extend(results)

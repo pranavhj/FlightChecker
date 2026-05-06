@@ -2,15 +2,29 @@ routes:
   - origin: SJC
     destination: ORD
     one_way: false
-    outbound_window: { start: "2026-06-13", end: "2026-06-13" }
-    return_window:   { start: "2026-06-14", end: "2026-06-14" }
+    outbound_window: { start: "2026-06-13", end: "2026-06-30" }
+    return_window:   { start: "2026-06-14", end: "2026-06-30" }
     nonstop_only: true
 
   - origin: SFO
     destination: ORD
     one_way: false
-    outbound_window: { start: "2026-06-13", end: "2026-06-13" }
-    return_window:   { start: "2026-06-14", end: "2026-06-14" }
+    outbound_window: { start: "2026-06-13", end: "2026-06-30" }
+    return_window:   { start: "2026-06-14", end: "2026-06-30" }
+    nonstop_only: true
+
+  - origin: SJC
+    destination: LAS
+    one_way: false
+    outbound_window: { start: "2026-06-13", end: "2026-06-30" }
+    return_window:   { start: "2026-06-14", end: "2026-06-30" }
+    nonstop_only: true
+
+  - origin: SFO
+    destination: LAS
+    one_way: false
+    outbound_window: { start: "2026-06-13", end: "2026-06-30" }
+    return_window:   { start: "2026-06-14", end: "2026-06-30" }
     nonstop_only: true
 
 top_n_results: 3

@@ -1,8 +1,8 @@
 # FlightChecker
 
 ## State
-Currently: DOM selectors refined for Google Flights — airline names & baggage info now extracted correctly (2026-05-02)
-Last session: 2026-05-02
+Currently: Added continuous mode for background monitoring without scheduler (2026-05-06)
+Last session: 2026-05-06
 
 ## Done
 - Cloned repo, fixed Playwright API, encoding, pointer events, logging
@@ -21,6 +21,7 @@ Last session: 2026-05-02
 - **Updated extraction pipeline to handle baggage_text field**
 - **Updated OCR (Claude & easyocr) extractors to include baggage_text**
 - **Updated report template to display baggage information in all result tables**
+- **Added `--continuous` mode for background monitoring (runs every N minutes without scheduler)**
 
 ## Latest run results (2026-05-02_0323)
 SJC→ORD: Best combo $365 (outbound $151 + return $214)
@@ -40,8 +41,8 @@ SFO→ORD: Best combo $333 (outbound $119 + return $214)
 - Price alerts fired due to comparison with stale previous-run prices
 
 ## Next
-- Consider OCR fallback for baggage extraction if DOM selectors miss data (fallback available)
 - Monitor selector changes on Google Flights and update as needed
+- Can start/stop continuous mode from Discord as needed
 
 ## Key decisions
 - PYTHONIOENCODING=utf-8 required on Windows

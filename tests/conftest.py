@@ -26,6 +26,7 @@ def make_result(**kwargs) -> FlightResult:
         airline_text="Southwest",
         dep_time_text="7:00 AM",
         arr_time_text="8:30 AM",
+        baggage_text="",
         confidence="high",
         screenshot_path="",
         extraction_method="dom",

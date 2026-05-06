@@ -10,6 +10,21 @@ DURATION_RE = re.compile(r"(\d+h\s*\d*m?)")
 TIME_RE = re.compile(r"\d{1,2}:\d{2}\s*[AP]M", re.IGNORECASE)
 
 
+_EASYOCR_AVAILABLE: bool | None = None  # None = unchecked
+
+
+def _check_easyocr() -> bool:
+    global _EASYOCR_AVAILABLE
+    if _EASYOCR_AVAILABLE is None:
+        try:
+            import easyocr  # noqa: F401
+            _EASYOCR_AVAILABLE = True
+        except ImportError:
+            logger.warning("EasyOCR not installed (pip install easyocr) -- skipping OCR extraction")
+            _EASYOCR_AVAILABLE = False
+    return _EASYOCR_AVAILABLE
+
+
 class EasyOCRExtractor:
     def __init__(self, languages: list[str] = None):
         self._languages = languages or ["en"]
@@ -22,6 +37,8 @@ class EasyOCRExtractor:
         return self._reader
 
     def extract(self, screenshot_path: str) -> Optional[list[dict]]:
+        if not _check_easyocr():
+            return None
         path = Path(screenshot_path)
         if not path.exists():
             return None
