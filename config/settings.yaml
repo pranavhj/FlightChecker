@@ -6,7 +6,7 @@ schedule:
   run_times_utc: ["14:00", "20:00", "02:00"]  # 7am / 1pm / 7pm PT
 
 continuous:
-  interval_minutes: 15  # Run every N minutes in continuous mode (--continuous)
+  interval_minutes: 480  # Run every N minutes in continuous mode (--continuous) [8 hours = 3x/day]
 
 price_alerts:
   min_drop_pct: 5.0

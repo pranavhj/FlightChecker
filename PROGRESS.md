@@ -1,8 +1,8 @@
 # FlightChecker
 
 ## State
-Currently: Added continuous mode for background monitoring without scheduler (2026-05-06)
-Last session: 2026-05-06
+Currently: Running in continuous mode (480 min interval) with Discord posting enabled. DC→Bay Area routes split into two windows: Jul 5-14 and Jul 16-31 (12 routes total).
+Last session: 2026-05-19 (added Discord auto-posting)
 
 ## Done
 - Cloned repo, fixed Playwright API, encoding, pointer events, logging
@@ -15,13 +15,9 @@ Last session: 2026-05-06
 - Skyscanner disabled: blocked by Kasada "PRESS & HOLD" CAPTCHA
 - Added filtering: `nonstop_only` and `same_day_return` options in routes.yaml
 - Added SFO→LAS route, ran full June search: found $28-55 outbound, $28-60 return options (50-60% cheaper than SJC)
-- **Added baggage_text field to FlightResult model (new field for carrying baggage info)**
-- **Added baggage selectors to selector_registry.py for Google Flights and Skyscanner**
-- **Updated GoogleFlightsScraper & SkyscannerScraper to extract baggage information**
-- **Updated extraction pipeline to handle baggage_text field**
-- **Updated OCR (Claude & easyocr) extractors to include baggage_text**
-- **Updated report template to display baggage information in all result tables**
-- **Added `--continuous` mode for background monitoring (runs every N minutes without scheduler)**
+- Added baggage_text field to FlightResult model, selectors, extraction pipeline, OCR extractors, and report template
+- Added `--continuous` mode for background monitoring (runs every N minutes without scheduler)
+- **Added Discord auto-posting to continuous mode** — results posted every 8h when new reports generated
 
 ## Latest run results (2026-05-02_0323)
 SJC→ORD: Best combo $365 (outbound $151 + return $214)
@@ -29,8 +25,12 @@ SFO→ORD: Best combo $333 (outbound $119 + return $214)
 Price Alert: SFO→ORD outbound $119 (↓42.5% from $207)
 
 ## Routes configured (active)
-- SJC→ORD: June 13 (out), June 14 (ret) — nonstop only
-- SFO→ORD: June 13 (out), June 14 (ret) — nonstop only
+- SJC→ORD: June 13–30 (out), June 14–30 (ret) — nonstop only
+- SFO→ORD: June 13–30 (out), June 14–30 (ret) — nonstop only
+- SJC→LAS: June 13–30 (out), June 14–30 (ret) — nonstop only
+- SFO→LAS: June 13–30 (out), June 14–30 (ret) — nonstop only
+- IAD/BWI/DCA→SFO/SJC: Jul 5–14 one-way (Window A, after July 4th) — nonstop only
+- IAD/BWI/DCA→SFO/SJC: Jul 16–31 one-way (Window B, after July 15th) — nonstop only
 
 ## Latest run results (2026-05-02_2313)
 SJC→ORD: Best combo $385 (outbound $151 + return $234)

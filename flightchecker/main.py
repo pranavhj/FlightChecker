@@ -2,6 +2,7 @@
 import argparse
 import asyncio
 import logging
+import subprocess
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -12,7 +13,60 @@ import time as _time
 logger = logging.getLogger(__name__)
 
 
-def _run_once(config_dir: Path, date_override: str | None = None) -> None:
+def _post_to_discord(report_path: Path, route_results: list, run_time: str) -> None:
+    """Extract key prices from report and post to Discord."""
+    import re
+
+    if not report_path.exists():
+        return
+
+    content = report_path.read_text(encoding="utf-8")
+
+    # Extract the first price for each route (best option)
+    routes_summary = {}
+    route_pattern = r'## Route: ([\w\->]+) \((.*?)\)'
+    price_pattern = r'\| 1 \| [\d-]+ \| [\w ]+ \| [\w\s\n.–-]+ \| [\w\s\n.–-]+ \| [\d\w\s]+ \| [\w ]+ \| (\$[\d]+)'
+
+    for match in re.finditer(route_pattern, content):
+        route = match.group(1)
+        route_type = match.group(2)
+
+        # Find the price table after this route heading
+        section_start = match.end()
+        next_route = re.search(route_pattern, content[section_start:])
+        section_end = section_start + next_route.start() if next_route else len(content)
+
+        section = content[section_start:section_end]
+        prices = re.findall(r'\| \$(\d+)', section)
+        if prices:
+            routes_summary[route] = prices[0]
+
+    # Build Discord message
+    summary_lines = []
+    for route, price in sorted(routes_summary.items())[:12]:  # Limit to 12 routes
+        summary_lines.append(f"  **{route}:** ${price}")
+
+    if not summary_lines:
+        return
+
+    msg = f"**FlightChecker Update** ({run_time} UTC)\n\n" + "\n".join(summary_lines)
+
+    try:
+        subprocess.run(
+            [
+                "python",
+                "D:\\MyData\\Software\\openclaw-config\\bin\\discord-send.py",
+                "--target", "1482473282925101217",
+                "--message", msg
+            ],
+            check=False,
+            timeout=10
+        )
+    except Exception as e:
+        logger.warning("Failed to post to Discord: %s", e)
+
+
+def _run_once(config_dir: Path, date_override: str | None = None, post_discord: bool = False) -> None:
     from flightchecker.config_loader import load_routes, load_settings
     from flightchecker.scheduler import DailyRunner
     from flightchecker.reporter import Reporter
@@ -62,7 +116,7 @@ def _run_once(config_dir: Path, date_override: str | None = None) -> None:
             csv_dir = Path(storage_cfg.get("csv_dir", "outputs/csv"))
             csv_path = csv_dir / f"{run_tag}.csv"
             n = db.export_csv(csv_path, run_tag=run_tag)
-            logger.info("CSV export: %d rows → %s", n, csv_path)
+            logger.info("CSV export: %d rows -> %s", n, csv_path)
 
         db.close()
     else:
@@ -87,7 +141,7 @@ def _run_once(config_dir: Path, date_override: str | None = None) -> None:
         print(f"Price alerts: {len(alerts)}")
         for a in alerts:
             print(f"  {a['route']} {a['leg']} {a['date']} ({a['source']}): "
-                  f"${a['current_price']:.0f} ↓ from ${a['prior_price']:.0f} "
+                  f"${a['current_price']:.0f} v from ${a['prior_price']:.0f} "
                   f"({a['delta_pct']:.1f}%)")
     if manual_review:
         print(f"Manual review needed ({len(manual_review)}):")
@@ -97,6 +151,9 @@ def _run_once(config_dir: Path, date_override: str | None = None) -> None:
     if use_sqlite:
         print("\n--- Booking analysis ---")
         _cmd_analyze(config_dir, settings)
+
+    if post_discord:
+        _post_to_discord(report_path, route_results, run_time)
 
 
 def _cmd_analyze(config_dir: Path, settings: dict) -> None:
@@ -122,7 +179,7 @@ def _cmd_analyze(config_dir: Path, settings: dict) -> None:
     for route in routes:
         origin, dest = route.origin, route.destination
         print(f"{'='*60}")
-        print(f"  {origin} → {dest}")
+        print(f"  {origin} -> {dest}")
         print(f"{'='*60}")
 
         # Best round-trip combos (return routes only)
@@ -174,7 +231,7 @@ def _cmd_export_csv(settings: dict, output_path: Path | None) -> None:
     db = FlightDatabase(db_path)
     n = db.export_csv(output_path)
     db.close()
-    print(f"Exported {n} rows → {output_path}")
+    print(f"Exported {n} rows -> {output_path}")
 
 
 def main() -> None:
@@ -231,7 +288,7 @@ def main() -> None:
         print(f"Continuous mode started. Running every {interval_minutes} minute(s).")
         print("Press Ctrl+C to stop.")
         while True:
-            _run_once(config_dir, args.date_override)
+            _run_once(config_dir, args.date_override, post_discord=True)
             print(f"\nNext run in {interval_minutes} minute(s)...")
             _time.sleep(interval_minutes * 60)
         return
