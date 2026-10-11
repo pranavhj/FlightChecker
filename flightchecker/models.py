@@ -23,6 +23,7 @@ class FlightResult:
     total_hours: Optional[float] = None
     score: Optional[float] = None
     search_url: str = ""  # URL to the search results page for this leg
+    return_date: str = ""  # only set when leg="roundtrip"
 
 
 @dataclass
@@ -34,6 +35,9 @@ class RouteConfig:
     return_window: Optional[dict] = None  # only set when one_way=False
     nonstop_only: bool = False
     same_day_return: bool = False  # only valid for return trips
+    max_duration_hours: Optional[float] = None  # filter out flights longer than this
+    checked_bag_required: bool = False  # filter out fares with no checked bag included
+    same_airline_only: bool = False  # filter out itineraries mixing airlines across legs
 
 
 @dataclass
@@ -52,4 +56,5 @@ class RouteRunResult:
     outbound_results: list = field(default_factory=list)   # list[FlightResult]
     return_results: list = field(default_factory=list)     # list[FlightResult] or []
     best_pairings: list = field(default_factory=list)      # list[LegPairing] for return routes
+    roundtrip_results: list = field(default_factory=list)  # list[FlightResult] with leg="roundtrip"
     warnings: list = field(default_factory=list)           # list[str]

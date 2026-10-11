@@ -2,6 +2,7 @@
 import argparse
 import asyncio
 import logging
+import os
 import subprocess
 import sys
 from datetime import datetime, timezone
@@ -13,57 +14,107 @@ import time as _time
 logger = logging.getLogger(__name__)
 
 
+def _discord_enabled() -> bool:
+    """Return False if FLIGHTCHECKER_NO_DISCORD env var is set to a truthy value."""
+    val = os.getenv("FLIGHTCHECKER_NO_DISCORD", "").strip().lower()
+    return val not in ("1", "true", "yes", "on")
+
+
 def _post_to_discord(report_path: Path, route_results: list, run_time: str) -> None:
-    """Extract key prices from report and post to Discord."""
-    import re
-
-    if not report_path.exists():
+    """Post detailed flight options to Discord."""
+    if not route_results:
         return
 
-    content = report_path.read_text(encoding="utf-8")
+    def fmt_price(usd):
+        return f"${usd:.0f}" if usd else "?"
 
-    # Extract the first price for each route (best option)
-    routes_summary = {}
-    route_pattern = r'## Route: ([\w\->]+) \((.*?)\)'
-    price_pattern = r'\| 1 \| [\d-]+ \| [\w ]+ \| [\w\s\n.–-]+ \| [\w\s\n.–-]+ \| [\d\w\s]+ \| [\w ]+ \| (\$[\d]+)'
+    def clean_time(t: str) -> str:
+        """Collapse embedded newlines/whitespace from scraped time text."""
+        return " ".join(t.split()) if t else "?"
 
-    for match in re.finditer(route_pattern, content):
-        route = match.group(1)
-        route_type = match.group(2)
+    def fmt_flight(r) -> str:
+        time_str = clean_time(r.dep_time_text)
+        lines = [
+            f"• **{r.depart_date}** — {r.airline_text or '?'} — **{r.price_text or '?'}**",
+            f"  {time_str} · {r.duration_text or '?'} · {r.stops_text or '?'}",
+        ]
+        if r.baggage_text:
+            lines.append(f"  Bag: {r.baggage_text}")
+        if r.search_url:
+            lines.append(f"  <{r.search_url}>")
+        return "\n".join(lines)
 
-        # Find the price table after this route heading
-        section_start = match.end()
-        next_route = re.search(route_pattern, content[section_start:])
-        section_end = section_start + next_route.start() if next_route else len(content)
+    def send_msg(msg: str) -> None:
+        try:
+            subprocess.run(
+                ["python", "D:\\MyData\\Software\\openclaw-config\\bin\\discord-send.py",
+                 "--target", "1482473282925101217", "--message", msg],
+                check=False, timeout=10
+            )
+        except Exception as e:
+            logger.warning("Failed to post to Discord: %s", e)
 
-        section = content[section_start:section_end]
-        prices = re.findall(r'\| \$(\d+)', section)
-        if prices:
-            routes_summary[route] = prices[0]
+    send_msg(f"**FlightChecker Update** ({run_time} UTC)")
 
-    # Build Discord message
-    summary_lines = []
-    for route, price in sorted(routes_summary.items())[:12]:  # Limit to 12 routes
-        summary_lines.append(f"  **{route}:** ${price}")
+    for rr in route_results:
+        origin, dest = rr.route.origin, rr.route.destination
 
-    if not summary_lines:
-        return
+        if rr.outbound_results:
+            top = rr.outbound_results[:3]
+            block = f"**{origin} → {dest}** (Outbound — {len(top)} options)\n\n"
+            block += "\n\n".join(fmt_flight(r) for r in top)
+            send_msg(block)
 
-    msg = f"**FlightChecker Update** ({run_time} UTC)\n\n" + "\n".join(summary_lines)
+        if rr.return_results:
+            top = rr.return_results[:3]
+            block = f"**{dest} → {origin}** (Return — {len(top)} options)\n\n"
+            block += "\n\n".join(fmt_flight(r) for r in top)
+            send_msg(block)
 
-    try:
-        subprocess.run(
-            [
-                "python",
-                "D:\\MyData\\Software\\openclaw-config\\bin\\discord-send.py",
-                "--target", "1482473282925101217",
-                "--message", msg
-            ],
-            check=False,
-            timeout=10
-        )
-    except Exception as e:
-        logger.warning("Failed to post to Discord: %s", e)
+        if rr.roundtrip_results:
+            top = rr.roundtrip_results[:3]
+            block = f"**{origin} ↔ {dest}** (Round-trip — {len(top)} options)\n\n"
+            entries = []
+            for r in top:
+                dates = f"{r.depart_date} → {r.return_date}" if r.return_date else r.depart_date
+                time_str = clean_time(r.dep_time_text)
+                lines = [
+                    f"• **{dates}** — {r.airline_text or '?'} — **{r.price_text or '?'}**",
+                    f"  {time_str} · {r.duration_text or '?'} · {r.stops_text or '?'}",
+                ]
+                if r.baggage_text:
+                    lines.append(f"  Bag: {r.baggage_text}")
+                if r.search_url:
+                    lines.append(f"  <{r.search_url}>")
+                entries.append("\n".join(lines))
+            block += "\n\n".join(entries)
+            send_msg(block)
+
+        if rr.best_pairings:
+            top = rr.best_pairings[:3]
+            block = f"**{origin} ↔ {dest}** (Best combos)\n\n"
+            entries = []
+            for p in top:
+                out, ret = p.outbound, p.ret
+                out_time = clean_time(out.dep_time_text)
+                ret_time = clean_time(ret.dep_time_text)
+                lines = [
+                    f"• **{fmt_price(p.total_price_usd)}** total",
+                    f"  Out {out.depart_date} — {out.airline_text or '?'} — {fmt_price(out.price_usd)}"
+                    f" — {out_time} · {out.duration_text or '?'} · {out.stops_text or '?'}",
+                    f"  Ret {ret.depart_date} — {ret.airline_text or '?'} — {fmt_price(ret.price_usd)}"
+                    f" — {ret_time} · {ret.duration_text or '?'} · {ret.stops_text or '?'}",
+                ]
+                if out.baggage_text or ret.baggage_text:
+                    bag = out.baggage_text or ret.baggage_text
+                    lines.append(f"  Bag: {bag}")
+                if out.search_url:
+                    lines.append(f"  Outbound: <{out.search_url}>")
+                if ret.search_url:
+                    lines.append(f"  Return: <{ret.search_url}>")
+                entries.append("\n".join(lines))
+            block += "\n\n".join(entries)
+            send_msg(block)
 
 
 def _run_once(config_dir: Path, date_override: str | None = None, post_discord: bool = False) -> None:
@@ -152,8 +203,10 @@ def _run_once(config_dir: Path, date_override: str | None = None, post_discord: 
         print("\n--- Booking analysis ---")
         _cmd_analyze(config_dir, settings)
 
-    if post_discord:
+    if post_discord and _discord_enabled():
         _post_to_discord(report_path, route_results, run_time)
+    elif post_discord and not _discord_enabled():
+        logger.info("Discord notifications suppressed (FLIGHTCHECKER_NO_DISCORD is set)")
 
 
 def _cmd_analyze(config_dir: Path, settings: dict) -> None:
@@ -245,6 +298,8 @@ def main() -> None:
                         help="Print best booking time analysis from DB and exit")
     parser.add_argument("--export-csv", metavar="FILE", nargs="?", const="",
                         help="Export all DB data to CSV (optional output path)")
+    parser.add_argument("--no-discord", action="store_true",
+                        help="Suppress Discord notifications for this run (data still stored in DB)")
     args = parser.parse_args()
 
     config_dir = Path(args.config_dir)
@@ -285,10 +340,15 @@ def main() -> None:
     if args.continuous:
         # Continuous mode
         interval_minutes = settings.get("continuous", {}).get("interval_minutes", 15)
+        want_discord = not args.no_discord
         print(f"Continuous mode started. Running every {interval_minutes} minute(s).")
+        if not want_discord:
+            print("Discord notifications disabled (--no-discord).")
+        elif not _discord_enabled():
+            print("Discord notifications disabled (FLIGHTCHECKER_NO_DISCORD is set).")
         print("Press Ctrl+C to stop.")
         while True:
-            _run_once(config_dir, args.date_override, post_discord=True)
+            _run_once(config_dir, args.date_override, post_discord=want_discord)
             print(f"\nNext run in {interval_minutes} minute(s)...")
             _time.sleep(interval_minutes * 60)
         return

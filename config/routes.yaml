@@ -1,104 +1,12 @@
 routes:
-  - origin: SJC
-    destination: ORD
-    one_way: false
-    outbound_window: { start: "2026-06-13", end: "2026-06-30" }
-    return_window:   { start: "2026-06-14", end: "2026-06-30" }
-    nonstop_only: true
-
   - origin: SFO
-    destination: ORD
+    destination: "Mumbai"
     one_way: false
-    outbound_window: { start: "2026-06-13", end: "2026-06-30" }
-    return_window:   { start: "2026-06-14", end: "2026-06-30" }
-    nonstop_only: true
+    outbound_window: { start: "2026-07-25", end: "2026-08-02" }
+    return_window:   { start: "2026-08-15", end: "2026-08-30" }
+    nonstop_only: false
+    checked_bag_required: false
+    same_airline_only: false
+    max_duration_hours: 26
 
-  - origin: SJC
-    destination: LAS
-    one_way: false
-    outbound_window: { start: "2026-06-13", end: "2026-06-30" }
-    return_window:   { start: "2026-06-14", end: "2026-06-30" }
-    nonstop_only: true
-
-  - origin: SFO
-    destination: LAS
-    one_way: false
-    outbound_window: { start: "2026-06-13", end: "2026-06-30" }
-    return_window:   { start: "2026-06-14", end: "2026-06-30" }
-    nonstop_only: true
-
-  # DC → Bay Area: Window A (after Jul 4th, Jul 5–14)
-  - origin: IAD
-    destination: SFO
-    one_way: true
-    outbound_window: { start: "2026-07-05", end: "2026-07-14" }
-    nonstop_only: true
-
-  - origin: IAD
-    destination: SJC
-    one_way: true
-    outbound_window: { start: "2026-07-05", end: "2026-07-14" }
-    nonstop_only: true
-
-  - origin: BWI
-    destination: SFO
-    one_way: true
-    outbound_window: { start: "2026-07-05", end: "2026-07-14" }
-    nonstop_only: true
-
-  - origin: BWI
-    destination: SJC
-    one_way: true
-    outbound_window: { start: "2026-07-05", end: "2026-07-14" }
-    nonstop_only: true
-
-  - origin: DCA
-    destination: SFO
-    one_way: true
-    outbound_window: { start: "2026-07-05", end: "2026-07-14" }
-    nonstop_only: true
-
-  - origin: DCA
-    destination: SJC
-    one_way: true
-    outbound_window: { start: "2026-07-05", end: "2026-07-14" }
-    nonstop_only: true
-
-  # DC → Bay Area: Window B (after Jul 15th, Jul 16–31)
-  - origin: IAD
-    destination: SFO
-    one_way: true
-    outbound_window: { start: "2026-07-16", end: "2026-07-31" }
-    nonstop_only: true
-
-  - origin: IAD
-    destination: SJC
-    one_way: true
-    outbound_window: { start: "2026-07-16", end: "2026-07-31" }
-    nonstop_only: true
-
-  - origin: BWI
-    destination: SFO
-    one_way: true
-    outbound_window: { start: "2026-07-16", end: "2026-07-31" }
-    nonstop_only: true
-
-  - origin: BWI
-    destination: SJC
-    one_way: true
-    outbound_window: { start: "2026-07-16", end: "2026-07-31" }
-    nonstop_only: true
-
-  - origin: DCA
-    destination: SFO
-    one_way: true
-    outbound_window: { start: "2026-07-16", end: "2026-07-31" }
-    nonstop_only: true
-
-  - origin: DCA
-    destination: SJC
-    one_way: true
-    outbound_window: { start: "2026-07-16", end: "2026-07-31" }
-    nonstop_only: true
-
-top_n_results: 3
+top_n_results: 5

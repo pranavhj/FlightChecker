@@ -29,6 +29,11 @@ def load_routes(path: Path) -> tuple[list[RouteConfig], int]:
             one_way=one_way,
             outbound_window=r.get("outbound_window") or r.get("date_window"),
             return_window=return_window,
+            nonstop_only=r.get("nonstop_only", False),
+            same_day_return=r.get("same_day_return", False),
+            max_duration_hours=r.get("max_duration_hours"),
+            checked_bag_required=r.get("checked_bag_required", False),
+            same_airline_only=r.get("same_airline_only", False),
         ))
     return routes, top_n
 

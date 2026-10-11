@@ -7,7 +7,7 @@ from playwright.async_api import async_playwright
 from flightchecker.config_loader import date_range
 from flightchecker.extraction.pipeline import ExtractionPipeline
 from flightchecker.models import RouteConfig, RouteRunResult
-from flightchecker.ranker import rank_results, combine_legs
+from flightchecker.ranker import rank_results, combine_legs, has_checked_bag, is_single_airline, parse_price
 from flightchecker.scrapers.google_flights import GoogleFlightsScraper
 from flightchecker.scrapers.skyscanner import SkyscannerScraper
 
@@ -95,9 +95,30 @@ class DailyRunner:
                 if r.stops_text and "nonstop" in r.stops_text.lower()
             ]
 
+        # Apply max duration filter
+        if route.max_duration_hours is not None:
+            outbound_processed = [
+                r for r in outbound_processed
+                if r.total_hours is None or r.total_hours <= route.max_duration_hours
+            ]
+
+        # Apply checked bag filter
+        if route.checked_bag_required:
+            outbound_processed = [
+                r for r in outbound_processed
+                if has_checked_bag(r.baggage_text)
+            ]
+
+        # Apply same-airline filter
+        if route.same_airline_only:
+            outbound_processed = [
+                r for r in outbound_processed
+                if is_single_airline(r.airline_text)
+            ]
+
         return_ranked = []
+        return_all = []
         if not route.one_way and route.return_window:
-            return_all = []
             ret_dates = date_range(route.return_window)
             for d in ret_dates:
                 results, _ = await self._search_with_retry(scraper, route, d, "return", warnings)
@@ -112,6 +133,27 @@ class DailyRunner:
                     if r.stops_text and "nonstop" in r.stops_text.lower()
                 ]
 
+            # Apply max duration filter
+            if route.max_duration_hours is not None:
+                return_ranked = [
+                    r for r in return_ranked
+                    if r.total_hours is None or r.total_hours <= route.max_duration_hours
+                ]
+
+            # Apply checked bag filter
+            if route.checked_bag_required:
+                return_ranked = [
+                    r for r in return_ranked
+                    if has_checked_bag(r.baggage_text)
+                ]
+
+            # Apply same-airline filter
+            if route.same_airline_only:
+                return_ranked = [
+                    r for r in return_ranked
+                    if is_single_airline(r.airline_text)
+                ]
+
         pairings = []
         if outbound_processed and return_ranked:
             pairings = combine_legs(
@@ -122,12 +164,64 @@ class DailyRunner:
                 same_day_return=route.same_day_return,
             )
 
+        # Round-trip sweep: top-5 outbound dates × top-5 return dates (up to 25 searches)
+        roundtrip_results = []
+        if not route.one_way and route.return_window and outbound_all and return_all and hasattr(scraper, "search_roundtrip"):
+            # Parse prices into all raw results so we can rank by date
+            for r in outbound_all:
+                if r.price_usd is None:
+                    r.price_usd = parse_price(r.price_text)
+            for r in return_all:
+                if r.price_usd is None:
+                    r.price_usd = parse_price(r.price_text)
+
+            out_by_date: dict[str, float] = {}
+            for r in outbound_all:
+                if r.price_usd is not None:
+                    if r.depart_date not in out_by_date or r.price_usd < out_by_date[r.depart_date]:
+                        out_by_date[r.depart_date] = r.price_usd
+            top_out_dates = sorted(out_by_date, key=out_by_date.get)[:5]
+
+            ret_by_date: dict[str, float] = {}
+            for r in return_all:
+                if r.price_usd is not None:
+                    if r.depart_date not in ret_by_date or r.price_usd < ret_by_date[r.depart_date]:
+                        ret_by_date[r.depart_date] = r.price_usd
+            top_ret_dates = sorted(ret_by_date, key=ret_by_date.get)[:5]
+
+            logger.info(
+                "Round-trip sweep: %d out × %d ret = %d combos",
+                len(top_out_dates), len(top_ret_dates), len(top_out_dates) * len(top_ret_dates),
+            )
+            for out_date in top_out_dates:
+                for ret_date in top_ret_dates:
+                    rt_batch, _ = await self._search_roundtrip_with_retry(
+                        scraper, route, out_date, ret_date, warnings
+                    )
+                    roundtrip_results.extend(rt_batch)
+
+            for r in roundtrip_results:
+                if r.price_usd is None:
+                    r.price_usd = parse_price(r.price_text)
+                if r.total_hours is None:
+                    from flightchecker.ranker import parse_hours
+                    r.total_hours = parse_hours(r.duration_text)
+            # Apply max duration filter to round-trip results (duration_text holds the longer leg)
+            if route.max_duration_hours is not None:
+                roundtrip_results = [
+                    r for r in roundtrip_results
+                    if r.total_hours is None or r.total_hours <= route.max_duration_hours
+                ]
+            roundtrip_results.sort(key=lambda r: r.price_usd if r.price_usd is not None else float("inf"))
+            roundtrip_results = roundtrip_results[: self.top_n * 3]
+
         return RouteRunResult(
             route=route,
             source=source_name,
             outbound_results=outbound_processed,
             return_results=return_ranked,
             best_pairings=pairings,
+            roundtrip_results=roundtrip_results,
             warnings=warnings,
         )
 
@@ -145,6 +239,27 @@ class DailyRunner:
             except Exception as e:
                 wait = backoff[attempt] if attempt < len(backoff) else backoff[-1]
                 msg = f"[{scraper.SOURCE}/{route.origin}→{route.destination}/{leg}/{date_str}] attempt {attempt+1} failed: {e}. Retrying in {wait}s."
+                logger.warning(msg)
+                warnings.append(msg)
+                if attempt < max_attempts - 1:
+                    await asyncio.sleep(wait)
+
+        return [], []
+
+    async def _search_roundtrip_with_retry(self, scraper, route, out_date, ret_date, warnings):
+        retry_cfg = self.settings.get("retries", {})
+        max_attempts = retry_cfg.get("max_attempts", 3)
+        backoff = retry_cfg.get("backoff_seconds", [30, 120, 300])
+
+        for attempt in range(max_attempts):
+            try:
+                results, screenshots = await scraper.search_roundtrip(
+                    route, out_date, ret_date, self.run_date, 1
+                )
+                return results, screenshots
+            except Exception as e:
+                wait = backoff[attempt] if attempt < len(backoff) else backoff[-1]
+                msg = f"[RT/{route.origin}→{route.destination}/{out_date}/{ret_date}] attempt {attempt+1} failed: {e}. Retrying in {wait}s."
                 logger.warning(msg)
                 warnings.append(msg)
                 if attempt < max_attempts - 1:

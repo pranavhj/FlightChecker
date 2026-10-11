@@ -39,6 +39,12 @@ class GoogleFlightsScraper(BaseScraper):
         q = f"one way flights from {origin} to {destination} {d.strftime('%B')} {d.day} {d.year}"
         return f"https://www.google.com/travel/flights?q={quote_plus(q)}"
 
+    def _build_roundtrip_url(self, origin: str, destination: str, outbound_date: str, return_date: str) -> str:
+        out = dobj.fromisoformat(outbound_date)
+        ret = dobj.fromisoformat(return_date)
+        q = f"flights from {origin} to {destination} {out.strftime('%B')} {out.day} to {ret.strftime('%B')} {ret.day} {ret.year}"
+        return f"https://www.google.com/travel/flights?q={quote_plus(q)}"
+
     async def search(
         self,
         route: RouteConfig,
@@ -98,6 +104,62 @@ class GoogleFlightsScraper(BaseScraper):
 
         return raw_rows, screenshots
 
+    async def search_roundtrip(
+        self,
+        route: RouteConfig,
+        outbound_date: str,
+        return_date: str,
+        run_date: str,
+        top_n: int,
+    ) -> tuple[list[FlightResult], list[str]]:
+        """
+        Search a round-trip on a single outbound+return date pair.
+        Returns the combined fare shown by Google Flights.
+        """
+        origin, destination = route.origin, route.destination
+        url = self._build_roundtrip_url(origin, destination, outbound_date, return_date)
+        page = await self.new_page()
+        screenshots: list[str] = []
+        raw_rows: list[FlightResult] = []
+
+        try:
+            logger.info("GoogleFlights RT navigating to: %s", url)
+            await page.goto(url, wait_until="commit", timeout=15_000)
+            try:
+                await page.wait_for_load_state("domcontentloaded", timeout=12_000)
+            except Exception:
+                pass
+            await self.human_pause(2000, 3500)
+
+            try:
+                await page.wait_for_selector(_S["card"][0], timeout=15_000)
+            except Exception:
+                logger.warning("GoogleFlights RT: timed out waiting for result cards")
+
+            await self.scroll_into_results(page)
+            await self.human_pause(800, 1500)
+
+            ss_path = screenshot_path(
+                self._screenshots_dir, run_date, self.SOURCE,
+                origin, destination, outbound_date, "roundtrip", "results"
+            )
+            shot = await self.safe_screenshot(page, ss_path)
+            if shot:
+                screenshots.append(shot)
+
+            raw_rows = await self._extract_cards(page, origin, destination, outbound_date, "roundtrip", top_n, shot)
+            for r in raw_rows:
+                r.search_url = url
+                r.return_date = return_date
+
+        except Exception as e:
+            logger.error("GoogleFlights RT search failed [%s->%s %s/%s]: %s",
+                         origin, destination, outbound_date, return_date, e)
+        finally:
+            await page.close()
+
+        return raw_rows, screenshots
+
     async def _extract_cards(
         self,
         page,
@@ -113,7 +175,17 @@ class GoogleFlightsScraper(BaseScraper):
         for card in cards[:top_n]:
             price_text = await self.get_text(card, _S["price"])
             airline_text = await self.get_text(card, _S["airline"])
-            duration_text = await self.get_text(card, _S["duration"])
+            if leg == "roundtrip":
+                # Round-trip cards contain two legs; grab all duration elements and use the longest.
+                all_durations = await self.get_all_texts(card, _S["duration"])
+                if all_durations:
+                    from flightchecker.ranker import parse_hours as _ph
+                    parsed = [(_ph(t) or 0, t) for t in all_durations]
+                    duration_text = max(parsed, key=lambda x: x[0])[1]
+                else:
+                    duration_text = ""
+            else:
+                duration_text = await self.get_text(card, _S["duration"])
             stops_text = await self.get_text(card, _S["stops"])
             dep_time_text = await self.get_text(card, _S["dep_time"])
             arr_time_text = await self.get_text(card, _S["arr_time"])

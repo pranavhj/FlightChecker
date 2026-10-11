@@ -4,7 +4,7 @@ from typing import Optional
 from flightchecker.models import FlightResult, LegPairing
 
 PRICE_RE = re.compile(r"[\$]?([\d,]+)")
-DURATION_RE = re.compile(r"(\d+)h\s*(\d*)m?")
+DURATION_RE = re.compile(r"(\d+)\s*h(?:r(?:s)?)?(?:\s*(\d+)\s*m(?:in(?:s)?)?)?")
 
 
 def parse_price(text: str) -> Optional[float]:
@@ -27,6 +27,32 @@ def compute_score(price_usd: Optional[float], total_hours: Optional[float], time
     if price_usd is None or total_hours is None:
         return None
     return round(price_usd + time_weight * total_hours, 2)
+
+
+def has_checked_bag(baggage_text: str) -> bool:
+    """Return True if baggage_text indicates at least 1 checked bag is included.
+    Returns True (pass through) when baggage info is absent or ambiguous."""
+    if not baggage_text:
+        return True  # can't determine — don't filter out
+    text = baggage_text.lower()
+    # Explicit zero checked bags
+    if re.search(r'\b0\s+checked', text):
+        return False
+    # Carry-on/personal-item only phrases
+    if 'carry-on only' in text or 'personal item only' in text:
+        return False
+    return True
+
+
+def is_single_airline(airline_text: str) -> bool:
+    """Return True if the itinerary is operated by a single airline.
+    Returns True when airline info is absent or can't be parsed."""
+    if not airline_text:
+        return True  # can't determine — don't filter out
+    # Multiple airlines are typically comma- or ·-separated, or on separate lines
+    parts = re.split(r'[,·\n]+', airline_text)
+    unique = {p.strip().lower() for p in parts if p.strip()}
+    return len(unique) <= 1
 
 
 def rank_results(results: list[FlightResult], time_weight: float, top_n: int) -> list[FlightResult]:

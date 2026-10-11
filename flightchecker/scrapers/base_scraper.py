@@ -63,6 +63,23 @@ class BaseScraper:
                 continue
         return ""
 
+    async def get_all_texts(self, element, selectors: list[str]) -> list[str]:
+        """Return inner_text for every matching element (all occurrences, not just first)."""
+        for sel in selectors:
+            try:
+                els = await element.query_selector_all(sel)
+                if els:
+                    texts = []
+                    for el in els:
+                        text = (await el.inner_text()).strip()
+                        if text:
+                            texts.append(text)
+                    if texts:
+                        return texts
+            except Exception:
+                continue
+        return []
+
     async def get_text_or_aria_label(self, element, selectors: list[str]) -> str:
         """Try selectors within an element, return first non-empty text or aria-label."""
         for sel in selectors:

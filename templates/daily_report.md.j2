@@ -37,10 +37,18 @@ _No return results found._
 {% endif %}
 
 {% if rr.best_pairings %}
-### Best Combinations (Outbound + Return)
+### Best Combinations (Outbound + Return — one-way sum)
 | Outbound Date | Outbound Airline | Return Date | Return Airline | Total Price | Combined Score | Search |
 |---------------|-----------------|-------------|----------------|-------------|----------------|--------|
 {% for p in rr.best_pairings %}| {{ p.outbound.depart_date }} | {{ p.outbound.airline_text or "—" }} (${{ "%.0f"|format(p.outbound.price_usd) if p.outbound.price_usd else "?" }}) | {{ p.ret.depart_date }} | {{ p.ret.airline_text or "—" }} (${{ "%.0f"|format(p.ret.price_usd) if p.ret.price_usd else "?" }}) | ${{ "%.0f"|format(p.total_price_usd) }} | {{ "%.2f"|format(p.combined_score) }} | {% if p.outbound.search_url %}[Out]({{ p.outbound.search_url }}){% endif %}{% if p.outbound.search_url and p.ret.search_url %} · {% endif %}{% if p.ret.search_url %}[Ret]({{ p.ret.search_url }}){% endif %} |
+{% endfor %}
+{% endif %}
+
+{% if rr.roundtrip_results %}
+### Round-trip Fares (combined price from Google Flights)
+| Outbound Date | Return Date | Airline | Price | Duration | Stops | Baggage | Method | Confidence | Link |
+|---------------|-------------|---------|-------|----------|-------|---------|--------|------------|------|
+{% for r in rr.roundtrip_results %}| {{ r.depart_date }} | {{ r.return_date }} | {{ r.airline_text or "—" }} | {{ r.price_text or "—" }} | {{ r.duration_text or "—" }} | {{ r.stops_text or "—" }} | {{ r.baggage_text or "—" }} | {{ r.extraction_method }} | {{ r.confidence }} | {% if r.search_url %}[Search]({{ r.search_url }}){% else %}—{% endif %} |
 {% endfor %}
 {% endif %}
 {% endif %}
