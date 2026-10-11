@@ -38,6 +38,7 @@ class RouteConfig:
     max_duration_hours: Optional[float] = None  # filter out flights longer than this
     checked_bag_required: bool = False  # filter out fares with no checked bag included
     same_airline_only: bool = False  # filter out itineraries mixing airlines across legs
+    date_pairs: list = field(default_factory=list)  # explicit (outbound, return) ISO date pairs; round-trip searches only
 
 
 @dataclass

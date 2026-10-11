@@ -7,7 +7,7 @@ from playwright.async_api import async_playwright
 from flightchecker.config_loader import date_range
 from flightchecker.extraction.pipeline import ExtractionPipeline
 from flightchecker.models import RouteConfig, RouteRunResult
-from flightchecker.ranker import rank_results, combine_legs, has_checked_bag, is_single_airline, parse_price
+from flightchecker.ranker import rank_results, combine_legs, has_checked_bag, is_single_airline, parse_hours, parse_price
 from flightchecker.scrapers.google_flights import GoogleFlightsScraper
 from flightchecker.scrapers.skyscanner import SkyscannerScraper
 
@@ -75,6 +75,9 @@ class DailyRunner:
         scraper = scraper_cls(context, self.settings)
         time_weight = self.settings.get("scoring", {}).get("time_weight_usd_per_hour", 15.0)
         warnings: list[str] = []
+
+        if route.date_pairs:
+            return await self._run_date_pairs(scraper, route, source_name, warnings)
 
         # Collect outbound results across all dates in window
         outbound_all = []
@@ -225,6 +228,30 @@ class DailyRunner:
             warnings=warnings,
         )
 
+    async def _run_date_pairs(self, scraper, route, source_name, warnings) -> RouteRunResult:
+        """Round-trip search for each explicit (outbound, return) pair; cheapest first."""
+        logger.info("Starting %s->%s via %s: %d round-trip date pairs",
+                    route.origin, route.destination, source_name, len(route.date_pairs))
+        found = []
+        for out_date, ret_date in route.date_pairs:
+            batch, _ = await self._search_roundtrip_with_retry(
+                scraper, route, out_date, ret_date, warnings, cards=6)
+            for r in batch:  # Google sorts by "Best", not price: read several cards, keep cheapest passing filters
+                r.price_usd = r.price_usd if r.price_usd is not None else parse_price(r.price_text)
+                r.total_hours = r.total_hours if r.total_hours is not None else parse_hours(r.duration_text)
+            ok = [
+                r for r in batch if r.price_usd is not None
+                and (not route.nonstop_only or (r.stops_text and "nonstop" in r.stops_text.lower()))
+                and (route.max_duration_hours is None or r.total_hours is None or r.total_hours <= route.max_duration_hours)
+            ]
+            if ok:
+                found.append(min(ok, key=lambda r: r.price_usd))
+
+        found.sort(key=lambda r: r.price_usd)
+        found = self._pipeline.process(found[: self.top_n * 3])
+        logger.info("%s->%s: %d priced round-trips kept", route.origin, route.destination, len(found))
+        return RouteRunResult(route=route, source=source_name, roundtrip_results=found, warnings=warnings)
+
     async def _search_with_retry(self, scraper, route, date_str, leg, warnings):
         retry_cfg = self.settings.get("retries", {})
         max_attempts = retry_cfg.get("max_attempts", 3)
@@ -246,7 +273,7 @@ class DailyRunner:
 
         return [], []
 
-    async def _search_roundtrip_with_retry(self, scraper, route, out_date, ret_date, warnings):
+    async def _search_roundtrip_with_retry(self, scraper, route, out_date, ret_date, warnings, cards: int = 1):
         retry_cfg = self.settings.get("retries", {})
         max_attempts = retry_cfg.get("max_attempts", 3)
         backoff = retry_cfg.get("backoff_seconds", [30, 120, 300])
@@ -254,7 +281,7 @@ class DailyRunner:
         for attempt in range(max_attempts):
             try:
                 results, screenshots = await scraper.search_roundtrip(
-                    route, out_date, ret_date, self.run_date, 1
+                    route, out_date, ret_date, self.run_date, cards
                 )
                 return results, screenshots
             except Exception as e:

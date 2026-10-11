@@ -153,6 +153,7 @@ def _run_once(config_dir: Path, date_override: str | None = None, post_discord: 
     for rr in route_results:
         all_flight_results.extend(rr.outbound_results)
         all_flight_results.extend(rr.return_results)
+        all_flight_results.extend(rr.roundtrip_results)
 
     min_drop = settings.get("price_alerts", {}).get("min_drop_pct", 5.0)
 

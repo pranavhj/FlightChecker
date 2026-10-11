@@ -1,12 +1,12 @@
 routes:
-  - origin: SFO
-    destination: "Mumbai"
-    one_way: false
-    outbound_window: { start: "2026-07-25", end: "2026-08-02" }
-    return_window:   { start: "2026-08-15", end: "2026-08-30" }
+  # Bay Area -> Washington DC area, 4-day weekend trips (Fri->Mon and Thu->Sun),
+  # every weekend from now through the end of 2026. Cheapest wins; stops allowed.
+  - origins: [SFO, OAK, SJC]
+    destinations: [IAD, DCA, BWI]
+    weekend_trips:
+      start: "2026-10-12"
+      end: "2026-12-31"
+      patterns: [[fri, mon], [thu, sun]]
     nonstop_only: false
-    checked_bag_required: false
-    same_airline_only: false
-    max_duration_hours: 26
 
 top_n_results: 5

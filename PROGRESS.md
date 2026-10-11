@@ -1,8 +1,8 @@
 # FlightChecker
 
 ## State
-Currently: Config updated for Bay Area → Washington DC trip. 3 routes (SFO/OAK/SJC → Washington DC), Aug 14–15 outbound, Aug 21–24 return, nonstop only.
-Last session: 2026-06-14
+Currently: Weekend search live: SFO/OAK/SJC -> IAD/DCA/BWI, 4-day Fri->Mon and Thu->Sun trips, every weekend through 2026-12-31 (9 routes x 22 date pairs, round-trip fares only, cheapest of top 6 cards). Old SFO->BOM route removed.
+Last session: 2026-10-11
 
 ## Done
 - Fixed Discord update: dep_time newlines cleaned (was "11:15 PM\n–\n9:35 AM"), best_pairings now shows times/duration/stops/baggage per leg
@@ -53,3 +53,4 @@ Last session: 2026-06-14
 - Duration regex must handle "28 hr 30 min" format and hours-only "3h" (regex made minutes group optional)
 - Round-trip sweep: after one-way sweep, pick top-5 out dates × top-5 ret dates → up to 25 RT searches → report shows combined fares
 - RT results stored as FlightResult with leg="roundtrip" and return_date field
+- `weekend_trips` route spec (routes.yaml): `origins`/`destinations` lists expand to all pairs; `patterns` = [out_weekday, ret_weekday]; pairs with return after `end` or before today are dropped
