@@ -1,8 +1,8 @@
 # FlightChecker
 
 ## State
-Currently: Weekend search live: SFO/OAK/SJC -> IAD/DCA/BWI, 4-day Fri->Mon and Thu->Sun trips, every weekend through 2026-12-31 (9 routes x 22 date pairs, round-trip fares only, cheapest of top 6 cards). Old SFO->BOM route removed.
-Last session: 2026-10-11
+Currently: Weekend search live: SFO/OAK/SJC -> IAD/DCA/BWI, 4-day Fri->Mon and Thu->Sun trips, every weekend through 2026-12-31. Each leg searched one-way and filtered separately (max_stops: 1, under 8.5 h), cheapest qualifying leg per date, paired by weekend and ranked by total. Report has an overall cheapest table across all 9 routes.
+Last session: 2026-10-12
 
 ## Done
 - Fixed Discord update: dep_time newlines cleaned (was "11:15 PM\n–\n9:35 AM"), best_pairings now shows times/duration/stops/baggage per leg
@@ -54,3 +54,4 @@ Last session: 2026-10-11
 - Round-trip sweep: after one-way sweep, pick top-5 out dates × top-5 ret dates → up to 25 RT searches → report shows combined fares
 - RT results stored as FlightResult with leg="roundtrip" and return_date field
 - `weekend_trips` route spec (routes.yaml): `origins`/`destinations` lists expand to all pairs; `patterns` = [out_weekday, ret_weekday]; pairs with return after `end` or before today are dropped
+- Weekend (date_pairs) routes use one-way searches per leg, not round-trip pages: a round-trip results page only describes the outbound flight, so the return leg could not be verified. Legs with unreadable price/stops/duration are rejected

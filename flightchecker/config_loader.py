@@ -65,6 +65,7 @@ def load_routes(path: Path) -> tuple[list[RouteConfig], int]:
                     nonstop_only=r.get("nonstop_only", False),
                     same_day_return=r.get("same_day_return", False),
                     max_duration_hours=r.get("max_duration_hours"),
+                    max_stops=r.get("max_stops"),
                     checked_bag_required=r.get("checked_bag_required", False),
                     same_airline_only=r.get("same_airline_only", False),
                     date_pairs=list(pairs),

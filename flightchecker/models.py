@@ -36,6 +36,7 @@ class RouteConfig:
     nonstop_only: bool = False
     same_day_return: bool = False  # only valid for return trips
     max_duration_hours: Optional[float] = None  # filter out flights longer than this
+    max_stops: Optional[int] = None  # filter out legs with more stops than this (date_pairs routes)
     checked_bag_required: bool = False  # filter out fares with no checked bag included
     same_airline_only: bool = False  # filter out itineraries mixing airlines across legs
     date_pairs: list = field(default_factory=list)  # explicit (outbound, return) ISO date pairs; round-trip searches only

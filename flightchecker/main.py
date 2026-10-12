@@ -59,13 +59,15 @@ def _post_to_discord(report_path: Path, route_results: list, run_time: str) -> N
     for rr in route_results:
         origin, dest = rr.route.origin, rr.route.destination
 
-        if rr.outbound_results:
+        per_leg = not rr.route.date_pairs  # weekend routes: the combos block already shows both legs
+
+        if per_leg and rr.outbound_results:
             top = rr.outbound_results[:3]
             block = f"**{origin} → {dest}** (Outbound — {len(top)} options)\n\n"
             block += "\n\n".join(fmt_flight(r) for r in top)
             send_msg(block)
 
-        if rr.return_results:
+        if per_leg and rr.return_results:
             top = rr.return_results[:3]
             block = f"**{dest} → {origin}** (Return — {len(top)} options)\n\n"
             block += "\n\n".join(fmt_flight(r) for r in top)

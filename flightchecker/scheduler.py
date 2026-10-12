@@ -6,8 +6,8 @@ from playwright.async_api import async_playwright
 
 from flightchecker.config_loader import date_range
 from flightchecker.extraction.pipeline import ExtractionPipeline
-from flightchecker.models import RouteConfig, RouteRunResult
-from flightchecker.ranker import rank_results, combine_legs, has_checked_bag, is_single_airline, parse_hours, parse_price
+from flightchecker.models import LegPairing, RouteConfig, RouteRunResult
+from flightchecker.ranker import rank_results, combine_legs, has_checked_bag, is_single_airline, parse_hours, parse_price, parse_stops
 from flightchecker.scrapers.google_flights import GoogleFlightsScraper
 from flightchecker.scrapers.skyscanner import SkyscannerScraper
 
@@ -229,30 +229,74 @@ class DailyRunner:
         )
 
     async def _run_date_pairs(self, scraper, route, source_name, warnings) -> RouteRunResult:
-        """Round-trip search for each explicit (outbound, return) pair; cheapest first."""
-        logger.info("Starting %s->%s via %s: %d round-trip date pairs",
-                    route.origin, route.destination, source_name, len(route.date_pairs))
-        found = []
+        """Weekend trips: search each leg one-way, filter BOTH legs, pair by date, cheapest total first.
+
+        A round-trip results page only describes the outbound flight, so the return leg's
+        stops and duration can't be verified there. Each leg is searched and filtered on its own.
+        """
+        time_weight = self.settings.get("scoring", {}).get("time_weight_usd_per_hour", 15.0)
+        out_dates = sorted({p[0] for p in route.date_pairs})
+        ret_dates = sorted({p[1] for p in route.date_pairs})
+        logger.info("Starting %s->%s via %s: %d outbound + %d return one-way searches (max_stops=%s, max_hours=%s)",
+                    route.origin, route.destination, source_name, len(out_dates), len(ret_dates),
+                    route.max_stops, route.max_duration_hours)
+
+        best_out = await self._cheapest_leg_per_date(scraper, route, out_dates, "outbound", warnings)
+        best_ret = await self._cheapest_leg_per_date(scraper, route, ret_dates, "return", warnings)
+
+        pairings = []
         for out_date, ret_date in route.date_pairs:
-            batch, _ = await self._search_roundtrip_with_retry(
-                scraper, route, out_date, ret_date, warnings, cards=6)
-            for r in batch:  # Google sorts by "Best", not price: read several cards, keep cheapest passing filters
+            out, ret = best_out.get(out_date), best_ret.get(ret_date)
+            if out is None or ret is None:
+                logger.info("%s->%s %s/%s: no qualifying %s leg", route.origin, route.destination,
+                            out_date, ret_date, "outbound" if out is None else "return")
+                continue
+            total = out.price_usd + ret.price_usd
+            pairings.append(LegPairing(
+                outbound=out, ret=ret, total_price_usd=total,
+                combined_score=round(total + time_weight * (out.total_hours + ret.total_hours), 2),
+            ))
+        pairings.sort(key=lambda p: p.total_price_usd)
+        logger.info("%s->%s: %d of %d weekends have a qualifying trip", route.origin, route.destination,
+                    len(pairings), len(route.date_pairs))
+        return RouteRunResult(
+            route=route, source=source_name,
+            outbound_results=sorted(best_out.values(), key=lambda r: r.price_usd),
+            return_results=sorted(best_ret.values(), key=lambda r: r.price_usd),
+            best_pairings=pairings, warnings=warnings,
+        )
+
+    async def _cheapest_leg_per_date(self, scraper, route, dates, leg, warnings) -> dict:
+        """One-way search per date; return {date: cheapest FlightResult passing the route's leg filters}.
+
+        Legs whose price, stops or duration can't be read are rejected, not passed through.
+        """
+        best = {}
+        for d in dates:
+            # Google sorts by "Best", not price: read several cards and pick the cheapest that qualifies
+            cards, _ = await self._search_with_retry(scraper, route, d, leg, warnings, cards=10)
+            ok = []
+            for r in cards:
                 r.price_usd = r.price_usd if r.price_usd is not None else parse_price(r.price_text)
                 r.total_hours = r.total_hours if r.total_hours is not None else parse_hours(r.duration_text)
-            ok = [
-                r for r in batch if r.price_usd is not None
-                and (not route.nonstop_only or (r.stops_text and "nonstop" in r.stops_text.lower()))
-                and (route.max_duration_hours is None or r.total_hours is None or r.total_hours <= route.max_duration_hours)
-            ]
+                stops = parse_stops(r.stops_text)
+                if r.price_usd is None or r.total_hours is None or stops is None:
+                    continue
+                if route.nonstop_only and stops != 0:
+                    continue
+                if route.max_stops is not None and stops > route.max_stops:
+                    continue
+                if route.max_duration_hours is not None and r.total_hours > route.max_duration_hours:
+                    continue
+                ok.append(r)
+            logger.debug("%s %s %s: %d cards, %d qualify", route.origin, leg, d, len(cards), len(ok))
+            if cards and not ok:
+                logger.info("%s->%s %s %s: %d cards read, none qualify", route.origin, route.destination, leg, d, len(cards))
             if ok:
-                found.append(min(ok, key=lambda r: r.price_usd))
+                best[d] = min(ok, key=lambda r: r.price_usd)
+        return best
 
-        found.sort(key=lambda r: r.price_usd)
-        found = self._pipeline.process(found[: self.top_n * 3])
-        logger.info("%s->%s: %d priced round-trips kept", route.origin, route.destination, len(found))
-        return RouteRunResult(route=route, source=source_name, roundtrip_results=found, warnings=warnings)
-
-    async def _search_with_retry(self, scraper, route, date_str, leg, warnings):
+    async def _search_with_retry(self, scraper, route, date_str, leg, warnings, cards: int | None = None):
         retry_cfg = self.settings.get("retries", {})
         max_attempts = retry_cfg.get("max_attempts", 3)
         backoff = retry_cfg.get("backoff_seconds", [30, 120, 300])
@@ -260,7 +304,7 @@ class DailyRunner:
         for attempt in range(max_attempts):
             try:
                 results, screenshots = await scraper.search(
-                    route, date_str, leg, self.run_date, self.top_n
+                    route, date_str, leg, self.run_date, cards or self.top_n
                 )
                 return results, screenshots
             except Exception as e:

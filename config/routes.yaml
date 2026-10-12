@@ -1,12 +1,14 @@
 routes:
   # Bay Area -> Washington DC area, 4-day weekend trips (Fri->Mon and Thu->Sun),
-  # every weekend from now through the end of 2026. Cheapest wins; stops allowed.
+  # every weekend from now through the end of 2026. Cheapest wins.
+  # Each leg (out and back) is searched and filtered separately: max 1 stop, under 8.5 h.
   - origins: [SFO, OAK, SJC]
     destinations: [IAD, DCA, BWI]
     weekend_trips:
       start: "2026-10-12"
       end: "2026-12-31"
       patterns: [[fri, mon], [thu, sun]]
-    nonstop_only: false
+    max_stops: 1
+    max_duration_hours: 8.49   # strictly under 8 h 30 min, per leg
 
 top_n_results: 5

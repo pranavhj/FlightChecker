@@ -23,6 +23,16 @@ def parse_hours(text: str) -> Optional[float]:
     return None
 
 
+def parse_stops(text: str) -> Optional[int]:
+    """'Nonstop' -> 0, '1 stop' -> 1, '2 stops' -> 2; None when unparseable."""
+    if not text:
+        return None
+    if "nonstop" in text.lower():
+        return 0
+    m = re.search(r"(\d+)\s*stop", text.lower())
+    return int(m.group(1)) if m else None
+
+
 def compute_score(price_usd: Optional[float], total_hours: Optional[float], time_weight: float) -> Optional[float]:
     if price_usd is None or total_hours is None:
         return None
