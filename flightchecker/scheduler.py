@@ -263,7 +263,7 @@ class DailyRunner:
                 combined_score=round(total + time_weight * (out.total_hours + ret.total_hours), 2),
             ))
         pairings.sort(key=lambda p: p.total_price_usd)
-        logger.info("%s->%s: %d of %d weekends have a qualifying trip", route.origin, route.destination,
+        logger.info("%s->%s: %d of %d date pairs have a qualifying trip", route.origin, route.destination,
                     len(pairings), len(route.date_pairs))
         return RouteRunResult(
             route=route, source=source_name,
