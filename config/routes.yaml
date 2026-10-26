@@ -1,5 +1,5 @@
 routes:
-  # Home (SFO, SJC) -> Washington DC area, trips of 3 to 7 days leaving any day
+  # Home (SFO, SJC) -> Washington DC area, trips of 4 to 7 days leaving any day
   # from today through the end of 2026. Cheapest wins.
   # Each leg (out and back) is searched and filtered separately: max 1 stop, under 8.5 h.
   - origins: [SFO, SJC]
@@ -7,8 +7,9 @@ routes:
     trips:
       start: "2026-10-27"
       end: "2026-12-31"
-      min_days: 3   # return 3..7 days after the outbound date
+      min_days: 4   # return 4..7 days after the outbound date (more than 3 days there)
       max_days: 7
+      exclude_dates: ["2026-12-02"]   # friend away: no trip that is in DC on Dec 2 (flying home that day is OK)
     max_stops: 1
     max_duration_hours: 8.49   # strictly under 8 h 30 min, per leg
 

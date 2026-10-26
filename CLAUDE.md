@@ -31,7 +31,7 @@ The service is a oneshot: never `restart` it mid-run unless you mean to abort th
 ## Routes configured
 
 `config/routes.yaml`: SFO and SJC → IAD, DCA, BWI. `trips:` = every departure day from today to
-2026-12-31, return 3-7 days later. Each leg is searched one-way and filtered on its own (max 1 stop,
+2026-12-31, return 4-7 days later, never in DC on Dec 2 (`exclude_dates`). Each leg is searched one-way and filtered on its own (max 1 stop,
 under 8 h 30 min), then paired by date and ranked by what you pay: `settings.coupon` (a $100
 Southwest credit, applied once per trip, capped at the Southwest fares) comes off first, so per date
 the cheapest leg AND the cheapest Southwest leg are kept. Delete `coupon:` when the credit is used. Also supported: `weekend_trips:`
