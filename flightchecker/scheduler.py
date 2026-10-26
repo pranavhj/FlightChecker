@@ -1,5 +1,7 @@
 import asyncio
 import logging
+import os
+import sys
 from datetime import date
 
 from playwright.async_api import async_playwright
@@ -32,13 +34,17 @@ class DailyRunner:
         profile_dir = browser_cfg.get("persistent_context_dir", ".browser_profile")
         headless = browser_cfg.get("headless", True)
         slow_mo = browser_cfg.get("slow_mo_ms", 150)
-        ua = browser_cfg.get("user_agent", "")
+        # Linux (the Pi): Debian chromium (Playwright has no build for it) and a matching Linux UA
+        on_linux = sys.platform.startswith("linux")
+        ua = browser_cfg.get("user_agent_linux" if on_linux else "user_agent", "")
+        executable = os.getenv("FLIGHTCHECKER_CHROMIUM") or (browser_cfg.get("executable_path_linux") if on_linux else None)
 
         all_results: list[RouteRunResult] = []
 
         async with async_playwright() as pw:
             context = await pw.chromium.launch_persistent_context(
                 profile_dir,
+                executable_path=executable or None,
                 headless=headless,
                 slow_mo=slow_mo,
                 user_agent=ua or None,

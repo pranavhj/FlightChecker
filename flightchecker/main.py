@@ -20,10 +20,18 @@ def _discord_enabled() -> bool:
     return val not in ("1", "true", "yes", "on")
 
 
-def _post_to_discord(report_path: Path, route_results: list, run_time: str) -> None:
-    """Post detailed flight options to Discord."""
+def _post_to_discord(report_path: Path, route_results: list, run_time: str, settings: dict) -> None:
+    """Post detailed flight options to Discord (settings.discord: send_command, target, env)."""
     if not route_results:
         return
+    discord_cfg = settings.get("discord", {})
+    send_command = discord_cfg.get("send_command")
+    target = discord_cfg.get("target")
+    if not send_command or not target:
+        logger.warning("Discord not configured (settings.discord.send_command/target) -- skipping post")
+        return
+    send_env = {**os.environ, **{k: str(Path(v).expanduser()) for k, v in discord_cfg.get("env", {}).items()}}
+    send_command = [str(Path(c).expanduser()) if c.startswith("~") else c for c in send_command]
 
     def fmt_price(usd):
         return f"${usd:.0f}" if usd else "?"
@@ -46,15 +54,26 @@ def _post_to_discord(report_path: Path, route_results: list, run_time: str) -> N
 
     def send_msg(msg: str) -> None:
         try:
-            subprocess.run(
-                ["python", "D:\\MyData\\Software\\openclaw-config\\bin\\discord-send.py",
-                 "--target", "1482473282925101217", "--message", msg],
-                check=False, timeout=10
+            proc = subprocess.run(
+                send_command + ["--target", str(target), "--message", msg],
+                check=False, timeout=30, env=send_env, capture_output=True, text=True,
             )
+            if proc.returncode != 0:
+                logger.warning("Discord send failed (exit %d): %s", proc.returncode, proc.stderr.strip()[-300:])
         except Exception as e:
             logger.warning("Failed to post to Discord: %s", e)
 
     send_msg(f"**FlightChecker Update** ({run_time} UTC)")
+
+    all_pairs = sorted((p for rr in route_results if rr.route.date_pairs for p in rr.best_pairings),
+                       key=lambda p: p.total_price_usd)[:5]
+    if all_pairs:
+        lines = ["**Cheapest trips overall** (both legs: max 1 stop, under 8.5 h)"]
+        for p in all_pairs:
+            out, ret = p.outbound, p.ret
+            lines.append(f"• **{fmt_price(p.total_price_usd)}** {out.origin}→{out.destination} "
+                         f"{out.depart_date} → {ret.depart_date} — {out.airline_text or '?'} / {ret.airline_text or '?'}")
+        send_msg("\n".join(lines))
 
     for rr in route_results:
         origin, dest = rr.route.origin, rr.route.destination
@@ -207,7 +226,7 @@ def _run_once(config_dir: Path, date_override: str | None = None, post_discord: 
         _cmd_analyze(config_dir, settings)
 
     if post_discord and _discord_enabled():
-        _post_to_discord(report_path, route_results, run_time)
+        _post_to_discord(report_path, route_results, run_time, settings)
     elif post_discord and not _discord_enabled():
         logger.info("Discord notifications suppressed (FLIGHTCHECKER_NO_DISCORD is set)")
 
@@ -303,6 +322,8 @@ def main() -> None:
                         help="Export all DB data to CSV (optional output path)")
     parser.add_argument("--no-discord", action="store_true",
                         help="Suppress Discord notifications for this run (data still stored in DB)")
+    parser.add_argument("--discord", action="store_true",
+                        help="With --once: post the results to Discord (settings.discord)")
     args = parser.parse_args()
 
     config_dir = Path(args.config_dir)
@@ -337,7 +358,7 @@ def main() -> None:
         return
 
     if args.once:
-        _run_once(config_dir, args.date_override)
+        _run_once(config_dir, args.date_override, post_discord=args.discord)
         return
 
     if args.continuous:

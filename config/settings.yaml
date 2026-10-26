@@ -2,6 +2,7 @@ scoring:
   time_weight_usd_per_hour: 15.0
 
 schedule:
+  # Scheduled mode only (python -m flightchecker). On the Pi the systemd timer runs --once daily instead.
   runs_per_day: 3
   run_times_utc: ["14:00", "20:00", "02:00"]  # 7am / 1pm / 7pm PT
 
@@ -16,6 +17,16 @@ browser:
   slow_mo_ms: 150
   persistent_context_dir: ".browser_profile"
   user_agent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+  # On Linux (the Pi): Debian chromium + the UA a headed Chrome on Linux sends (not "HeadlessChrome")
+  executable_path_linux: "/usr/bin/chromium"
+  user_agent_linux: "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/155.0.0.0 Safari/537.36"
+
+discord:
+  # Posted with --once --discord (the Pi timer) and in --continuous mode. Channel: #reminders.
+  target: "1564021528419508386"
+  send_command: ["~/diary/venv/bin/python", "~/diary/bin/discord-send.py"]
+  env:
+    HOME: "~/diary/home"   # discord-send.py reads the bot token from $HOME/.openclaw/openclaw.json
 
 retries:
   max_attempts: 3

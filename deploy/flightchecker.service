@@ -1,0 +1,21 @@
+[Unit]
+Description=FlightChecker: one full Google Flights search, report, Discord post (started by flightchecker.timer)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=admin
+WorkingDirectory=/home/admin/flightchecker
+Environment=PYTHONIOENCODING=utf-8
+Environment=PYTHONUNBUFFERED=1
+# Clear a stale Chromium profile lock left by a crashed run
+ExecStartPre=/bin/rm -f /home/admin/flightchecker/.browser_profile/SingletonLock /home/admin/flightchecker/.browser_profile/SingletonSocket /home/admin/flightchecker/.browser_profile/SingletonCookie
+ExecStart=/home/admin/flightchecker/.venv/bin/python -m flightchecker --once --discord
+# A full run is ~750 one-way searches (2-3 h); stop a hung run well before the next day's
+TimeoutStartSec=6h
+Nice=10
+# Stops the app and the Chromium it started, together
+KillMode=control-group
+StandardOutput=append:/home/admin/flightchecker/logs/flightchecker.log
+StandardError=append:/home/admin/flightchecker/logs/flightchecker.log

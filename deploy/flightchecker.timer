@@ -1,0 +1,11 @@
+[Unit]
+Description=Run FlightChecker once a day (7:00 am Pacific)
+
+[Timer]
+OnCalendar=*-*-* 07:00:00 America/Los_Angeles
+# Catch up after the Pi was off at 7 am
+Persistent=true
+RandomizedDelaySec=10min
+
+[Install]
+WantedBy=timers.target

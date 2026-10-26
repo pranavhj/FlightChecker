@@ -10,4 +10,5 @@ build/
 outputs/
 .browser_profile/
 *.log
+logs/
 .pytest_cache/
