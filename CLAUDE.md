@@ -1,63 +1,80 @@
 # FlightChecker
 
-Playwright-based flight price monitor. Scrapes Google Flights and Skyscanner 3x/day, outputs a Markdown report, tracks price history, and alerts on drops.
+Playwright flight price monitor. Searches Google Flights once a day, writes a Markdown report,
+keeps price history in SQLite, posts the cheapest trips to Discord #reminders, alerts on drops.
 
-## What was built
+## Where it runs: the Raspberry Pi 5 (moved 2026-10-26)
 
-- **One-way and return flight support** — return routes search each leg independently (outbound + return as separate one-way searches), then rank best combinations by total cost
-- **4-tier extraction pipeline** — DOM → Claude vision OCR → EasyOCR → manual review flag
-- **Claude OCR via delegation** — no Anthropic API key; uses `scripts/agent-smart.py` (minimal claude CLI wrapper) to delegate vision calls through Claude Code's own auth
-- **Price history + delta alerts** — persisted in `outputs/price_history.json`; alerts fire when price drops ≥5% vs previous run
-- **3x/day scheduler** — 7am/1pm/7pm PT; `--once` flag for single runs
+- Repo: **`pi5:flightchecker`** (`~/flightchecker`, branch `claude/dc-trips-pi`), mirrored to
+  GitHub `pranavhj/FlightChecker` (same branch). The Pi copy is the deployed one; the PC folder
+  `C:\Users\prana\projects\flightchecker` holds only a pointer `CLAUDE.md`.
+- Runtime: systemd **timer** `flightchecker.timer` (07:00 PT daily, `Persistent=true`) starts the
+  oneshot `flightchecker.service` = `.venv/bin/python -m flightchecker --once --discord` (2-3 h).
+- Logs: `~/flightchecker/logs/flightchecker.log` (stdout, rotated weekly) and one file per run in
+  `~/flightchecker/outputs/logs/`. Reports: `outputs/reports/`, DB: `outputs/flights.db`, CSV: `outputs/csv/`.
+- Browser: Debian `/usr/bin/chromium` (Playwright has no arm64 Debian build), headless, Linux UA
+  (`browser.*_linux` in `config/settings.yaml`; `FLIGHTCHECKER_CHROMIUM` env overrides the path).
+- Discord: `settings.discord` → `~/diary/bin/discord-send.py` with `HOME=~/diary/home` (bot token
+  lives there), channel `#reminders` 1564021528419508386.
+- No Claude CLI on the Pi: the Claude-OCR fallback is skipped (logs a warning); DOM extraction
+  handles every card today. EasyOCR is not installed (optional, ~2 GB torch).
+
+```bash
+ssh pi5 systemctl list-timers flightchecker.timer               # next run
+ssh pi5 sudo systemctl start --no-block flightchecker.service   # run now
+ssh pi5 tail -f flightchecker/logs/flightchecker.log            # watch
+ssh pi5 'ls -t flightchecker/outputs/reports | head -1'         # latest report
+ssh pi5 'cd flightchecker && .venv/bin/python -m flightchecker --dry-run'   # validate config
+```
+The service is a oneshot: never `restart` it mid-run unless you mean to abort the search.
 
 ## Routes configured
 
-`config/routes.yaml` — SJC→LAS and SJC→ORD, both return, May–June 2026 windows.
+`config/routes.yaml`: SFO and SJC → IAD, DCA, BWI. `trips:` = every departure day from today to
+2026-12-31, return 3-7 days later. Each leg is searched one-way and filtered on its own (max 1 stop,
+under 8 h 30 min), then paired by date and ranked by total price. Also supported: `weekend_trips:`
+(weekday patterns) and plain `outbound_window`/`return_window`.
 
-## How to run
+## Changing the code: clone → change → push (Pi + GitHub) → test → delete
 
 ```bash
-# Validate config
-python -m flightchecker --dry-run
-
-# Single run
-python -m flightchecker --once
-
-# Scheduled (3x/day)
-python -m flightchecker
+cd ~/projects/flightchecker
+git clone pi5:flightchecker repo && cd repo
+git remote add github https://github.com/pranavhj/FlightChecker
+python -m pytest tests -q                       # tests run on the PC too (venv of your choice)
+# ...edit, commit, then push to BOTH so they stay in sync:
+git push && git push github HEAD
+ssh pi5 'cd flightchecker && .venv/bin/python -m pytest tests -q'
+ssh pi5 'bash flightchecker/deploy/install_pi.sh'   # only if requirements or deploy/ changed
+ssh pi5 sudo systemctl start --no-block flightchecker.service   # real run
 ```
+Delete the clone only after `git status --short` and `git log @{u}..` both print nothing
+(and `git log github/<branch>..` is empty after a fetch).
 
-Requires `claude` on PATH and logged in (used by OCR fallback via `scripts/agent-smart.py`).
+Rules: never edit files on the Pi by hand (pushes use `receive.denyCurrentBranch=updateInstead`,
+which needs a clean tree); never copy code with scp/tar; don't run FlightChecker on the PC.
+Background Claude sessions must `EnterWorktree` before editing inside `repo/`.
 
 ## Key files
 
 ```
 config/routes.yaml          # add/edit routes here
-config/settings.yaml        # headless, schedule, scoring, alert threshold
+config/settings.yaml        # browser, Discord, scoring, alert threshold, storage
+deploy/                     # systemd service + timer, logrotate, install_pi.sh (idempotent)
+flightchecker/scheduler.py  # search loop; _run_date_pairs = both-legs-filtered trips
 flightchecker/scrapers/selector_registry.py   # CSS selectors — update when sites change DOM
-flightchecker/extraction/ocr_claude.py        # Claude OCR via agent-smart delegation
-scripts/agent-smart.py      # minimal claude CLI wrapper (--print-file → stdin pipe)
-outputs/price_history.json  # persisted price history (gitignored)
-outputs/reports/            # generated Markdown reports (gitignored)
+templates/daily_report.md.j2                  # report layout
 ```
 
-## Dependency notes
+## Selector maintenance / bot detection
 
-- `easyocr` (tertiary OCR fallback) is in `requirements.txt` but optional — skip it to avoid the ~2GB PyTorch install. Pipeline works without it.
-- `anthropic` SDK is NOT used — OCR goes through `scripts/agent-smart.py` instead.
-
-## Selector maintenance
-
-Google Flights and Skyscanner update their DOM regularly. When reports show mostly `ocr_claude` extraction method instead of `dom`, the selectors in `selector_registry.py` are stale. Run with `headless: false` in `settings.yaml` to inspect the live page and update selectors.
-
-## Bot detection
-
-If reports return empty results with `manual_review` confidence, the scraper is likely being blocked. First step: set `headless: false` in `config/settings.yaml` and re-run to see what the browser is receiving.
+When reports show `ocr_claude`/`manual_review` instead of `dom`, or come back empty, Google changed
+the DOM or is blocking. Look at the screenshots in `outputs/screenshots/` on the Pi; to watch a live
+browser, run once with `headless: false` on the Pi desktop (VNC `pi5.local:5900`,
+`DISPLAY=:0 WAYLAND_DISPLAY=wayland-0 XDG_RUNTIME_DIR=/run/user/1000`).
 
 ## Tests
 
 ```bash
-python -m pytest tests/ -v
+python -m pytest tests/ -q     # 32 tests: ranker, config loader (incl. trips), price history, extraction
 ```
-
-29 tests covering ranker, config loader, price history, and extraction pipeline.

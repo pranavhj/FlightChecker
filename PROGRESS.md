@@ -1,8 +1,9 @@
 # FlightChecker
 
 ## State
-Currently: Weekend search live: SFO/OAK/SJC -> IAD/DCA/BWI, 4-day Fri->Mon and Thu->Sun trips, every weekend through 2026-12-31. Each leg searched one-way and filtered separately (max_stops: 1, under 8.5 h), cheapest qualifying leg per date, paired by weekend and ranked by total. Report has an overall cheapest table across all 9 routes.
-Last session: 2026-10-12
+Currently: Runs on the Raspberry Pi (pi5:flightchecker, systemd timer 07:00 PT daily, posts to Discord #reminders). PC folder holds only a pointer CLAUDE.md.
+Search: SFO/SJC -> IAD/DCA/BWI, trips of 3-7 days leaving any day through 2026-12-31 (`trips:` spec). Each leg searched one-way and filtered separately (max 1 stop, under 8.5 h), paired by date, ranked by total.
+Last session: 2026-10-26
 
 ## Done
 - Fixed Discord update: dep_time newlines cleaned (was "11:15 PM\n–\n9:35 AM"), best_pairings now shows times/duration/stops/baggage per leg
