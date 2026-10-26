@@ -1,0 +1,33 @@
+scoring:
+  time_weight_usd_per_hour: 15.0
+
+schedule:
+  runs_per_day: 3
+  run_times_utc: ["14:00", "20:00", "02:00"]  # 7am / 1pm / 7pm PT
+
+price_alerts:
+  min_drop_pct: 5.0
+
+browser:
+  headless: true
+  slow_mo_ms: 150
+  persistent_context_dir: ".browser_profile"
+  user_agent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+
+retries:
+  max_attempts: 3
+  backoff_seconds: [30, 120, 300]
+
+ocr:
+  primary: "claude_vision"
+  claude_model: "haiku"
+  easyocr_languages: ["en"]
+
+sources:
+  - google_flights
+  # skyscanner disabled — Kasada "PRESS & HOLD" CAPTCHA blocks headless browsers
+
+output:
+  screenshots_dir: "outputs/screenshots"
+  reports_dir: "outputs/reports"
+  price_history_file: "outputs/price_history.json"
