@@ -64,7 +64,7 @@ def _leg(r) -> str:
 def pick_trips(pairings: list, max_rows: int = 8, per_route: int = 2) -> list:
     """Cheapest trips overall, at most `per_route` per origin->destination so one route can't fill the table."""
     picked, count = [], {}
-    for p in sorted(pairings, key=lambda p: p.total_price_usd):
+    for p in sorted(pairings, key=lambda p: (_cost(p), p.total_price_usd)):
         key = (p.outbound.origin, p.outbound.destination)
         if count.get(key, 0) < per_route:
             picked.append(p)
@@ -74,21 +74,28 @@ def pick_trips(pairings: list, max_rows: int = 8, per_route: int = 2) -> list:
     return picked
 
 
-def format_trip_messages(pairings: list, run_time: str) -> list[str]:
+def _cost(p) -> float:
+    """What you pay for the trip: after the coupon when one applies."""
+    return p.cost_usd if p.cost_usd is not None else p.total_price_usd
+
+
+def format_trip_messages(pairings: list, run_time: str, coupon: dict | None = None) -> list[str]:
     """Discord messages (each <= 2000 chars): header + table, then links (8 rows of links fit one message)."""
     trips = pick_trips(pairings)
     if not trips:
         return [f"**FlightChecker** ({run_time} UTC): no trip passed the filters."]
-    header = f"{'#':<2} {'Total':<5} {'Route':<7} {'Dates':<12} {'Days':>4}  {'Out':<20}  Back"
+    header = f"{'#':<2} {'Pay':<5} {'Fare':<5} {'Route':<7} {'Dates':<12} {'Days':>4}  {'Out':<20}  Back"
     rows = []
     for i, p in enumerate(trips, 1):
         out, ret = p.outbound, p.ret
         days = (date.fromisoformat(ret.depart_date) - date.fromisoformat(out.depart_date)).days
-        rows.append(f"{i:<2} {f'${p.total_price_usd:.0f}':<5} {out.origin}-{out.destination} "
+        rows.append(f"{i:<2} {f'${_cost(p):.0f}':<5} {f'${p.total_price_usd:.0f}':<5} {out.origin}-{out.destination} "
                     f"{short_dates(out.depart_date, ret.depart_date):<12} {days:>3}d  {_leg(out)}  {_leg(ret)}")
+    credit = (f"Pay = fare minus your ${coupon['amount_usd']} {coupon['airline']} credit (once per trip); "
+              if coupon else "")
     table = (f"**FlightChecker** ({run_time} UTC): cheapest trips, both legs max 1 stop and under 8.5 h\n"
              "```\n" + "\n".join([header, *rows]) + "\n```\n"
-             "-# Out/Back = airline, departs, duration, stops (0s = nonstop)")
+             f"-# {credit}Out/Back = airline, departs, duration, stops (0s = nonstop)")
     links = [f"{i} [out](<{p.outbound.search_url}>) · [back](<{p.ret.search_url}>)" for i, p in enumerate(trips, 1)]
     return [table, *_chunk(links, "\n")]
 

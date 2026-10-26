@@ -67,7 +67,22 @@ def test_one_route_cannot_fill_the_table():
 
 def test_table_row_shows_route_dates_days_and_both_legs():
     table = format_trip_messages([pairing("SJC", "DCA", "2026-12-02", "2026-12-05", 272)], "14:00")[0]
-    assert "1  $272  SJC-DCA Dec 2-5        3d  WN     6:00a 7h15 1s  F9     9:35p 8h00 0s" in table
+    assert "1  $272  $272  SJC-DCA Dec 2-5        3d  WN     6:00a 7h15 1s  F9     9:35p 8h00 0s" in table
+
+
+def test_table_ranks_by_price_after_coupon():
+    southwest = pairing("SJC", "DCA", "2026-12-02", "2026-12-05", 272)
+    southwest.coupon_usd, southwest.cost_usd = 100, 172
+    other = pairing("SFO", "BWI", "2026-11-16", "2026-11-19", 200)
+    other.cost_usd = 200
+    assert [p.cost_usd for p in pick_trips([other, southwest])] == [172, 200]
+
+
+def test_table_row_shows_pay_and_fare():
+    p = pairing("SJC", "DCA", "2026-12-02", "2026-12-05", 272)
+    p.coupon_usd, p.cost_usd = 100, 172
+    table = format_trip_messages([p], "14:00", {"airline": "Southwest", "amount_usd": 100})[0]
+    assert "1  $172  $272  SJC-DCA" in table
 
 
 def test_links_message_has_masked_out_and_back_links():

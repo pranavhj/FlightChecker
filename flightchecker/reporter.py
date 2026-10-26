@@ -33,6 +33,7 @@ class Reporter:
             route_results=route_results,
             alerts=alerts,
             time_weight=time_weight,
+            settings=settings,
         )
 
         report_path.parent.mkdir(parents=True, exist_ok=True)

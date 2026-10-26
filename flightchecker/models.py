@@ -49,6 +49,8 @@ class LegPairing:
     ret: FlightResult
     total_price_usd: float
     combined_score: float
+    coupon_usd: float = 0.0               # airline credit applied to this trip (settings.coupon)
+    cost_usd: Optional[float] = None      # what you pay: total_price_usd - coupon_usd
 
 
 @dataclass

@@ -9,7 +9,10 @@ from playwright.async_api import async_playwright
 from flightchecker.config_loader import date_range
 from flightchecker.extraction.pipeline import ExtractionPipeline
 from flightchecker.models import LegPairing, RouteConfig, RouteRunResult
-from flightchecker.ranker import rank_results, combine_legs, has_checked_bag, is_single_airline, parse_hours, parse_price, parse_stops
+from flightchecker.ranker import (
+    rank_results, combine_legs, coupon_discount, has_checked_bag, is_coupon_airline, is_single_airline,
+    parse_hours, parse_price, parse_stops,
+)
 from flightchecker.scrapers.google_flights import GoogleFlightsScraper
 from flightchecker.scrapers.skyscanner import SkyscannerScraper
 
@@ -247,34 +250,44 @@ class DailyRunner:
                     route.origin, route.destination, source_name, len(out_dates), len(ret_dates),
                     route.max_stops, route.max_duration_hours)
 
-        best_out = await self._cheapest_leg_per_date(scraper, route, out_dates, "outbound", warnings)
-        best_ret = await self._cheapest_leg_per_date(scraper, route, ret_dates, "return", warnings)
+        coupon = self.settings.get("coupon")
+        best_out = await self._cheapest_leg_per_date(scraper, route, out_dates, "outbound", warnings, coupon)
+        best_ret = await self._cheapest_leg_per_date(scraper, route, ret_dates, "return", warnings, coupon)
 
         pairings = []
         for out_date, ret_date in route.date_pairs:
-            out, ret = best_out.get(out_date), best_ret.get(ret_date)
-            if out is None or ret is None:
+            outs, rets = best_out.get(out_date, []), best_ret.get(ret_date, [])
+            if not outs or not rets:
                 logger.info("%s->%s %s/%s: no qualifying %s leg", route.origin, route.destination,
-                            out_date, ret_date, "outbound" if out is None else "return")
+                            out_date, ret_date, "outbound" if not outs else "return")
                 continue
-            total = out.price_usd + ret.price_usd
-            pairings.append(LegPairing(
-                outbound=out, ret=ret, total_price_usd=total,
-                combined_score=round(total + time_weight * (out.total_hours + ret.total_hours), 2),
-            ))
-        pairings.sort(key=lambda p: p.total_price_usd)
+            # Cheapest leg vs cheapest coupon-airline leg per date: keep the combination you pay least for
+            options = []
+            for out in outs:
+                for ret in rets:
+                    total = out.price_usd + ret.price_usd
+                    discount = coupon_discount(out, ret, coupon)
+                    options.append(LegPairing(
+                        outbound=out, ret=ret, total_price_usd=total,
+                        combined_score=round(total + time_weight * (out.total_hours + ret.total_hours), 2),
+                        coupon_usd=discount, cost_usd=total - discount,
+                    ))
+            pairings.append(min(options, key=lambda p: (p.cost_usd, p.combined_score)))
+        pairings.sort(key=lambda p: (p.cost_usd, p.combined_score))
         logger.info("%s->%s: %d of %d date pairs have a qualifying trip", route.origin, route.destination,
                     len(pairings), len(route.date_pairs))
         return RouteRunResult(
             route=route, source=source_name,
-            outbound_results=sorted(best_out.values(), key=lambda r: r.price_usd),
-            return_results=sorted(best_ret.values(), key=lambda r: r.price_usd),
+            outbound_results=sorted((r for legs in best_out.values() for r in legs), key=lambda r: r.price_usd),
+            return_results=sorted((r for legs in best_ret.values() for r in legs), key=lambda r: r.price_usd),
             best_pairings=pairings, warnings=warnings,
         )
 
-    async def _cheapest_leg_per_date(self, scraper, route, dates, leg, warnings) -> dict:
-        """One-way search per date; return {date: cheapest FlightResult passing the route's leg filters}.
+    async def _cheapest_leg_per_date(self, scraper, route, dates, leg, warnings, coupon: dict | None = None) -> dict:
+        """One-way search per date; return {date: [cheapest qualifying leg, cheapest qualifying coupon-airline leg]}.
 
+        The coupon-airline leg is kept even when dearer (the credit can make the trip cheaper);
+        the list has one entry when that leg is also the cheapest or there is none.
         Legs whose price, stops or duration can't be read are rejected, not passed through.
         """
         best = {}
@@ -299,7 +312,11 @@ class DailyRunner:
             if cards and not ok:
                 logger.info("%s->%s %s %s: %d cards read, none qualify", route.origin, route.destination, leg, d, len(cards))
             if ok:
-                best[d] = min(ok, key=lambda r: r.price_usd)
+                cheapest = min(ok, key=lambda r: r.price_usd)
+                best[d] = [cheapest]
+                coupon_legs = [r for r in ok if is_coupon_airline(r, coupon)]
+                if coupon_legs and not is_coupon_airline(cheapest, coupon):
+                    best[d].append(min(coupon_legs, key=lambda r: r.price_usd))
         return best
 
     async def _search_with_retry(self, scraper, route, date_str, leg, warnings, cards: int | None = None):

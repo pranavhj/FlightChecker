@@ -68,7 +68,7 @@ def _post_to_discord(report_path: Path, route_results: list, run_time: str, sett
     # Date-pair trips: one compact table + a line of links (see discord_summary)
     if any(rr.route.date_pairs for rr in route_results):
         trip_pairs = [p for rr in route_results if rr.route.date_pairs for p in rr.best_pairings]
-        for msg in format_trip_messages(trip_pairs, run_time):
+        for msg in format_trip_messages(trip_pairs, run_time, settings.get("coupon")):
             send_msg(msg)
 
     legacy = [rr for rr in route_results if not rr.route.date_pairs]

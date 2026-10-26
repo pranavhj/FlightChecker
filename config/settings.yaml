@@ -9,6 +9,12 @@ schedule:
 continuous:
   interval_minutes: 480  # Run every N minutes in continuous mode (--continuous) [8 hours = 3x/day]
 
+coupon:
+  # Single-use airline credit: trips are ranked by what you pay after it. Applied once per trip,
+  # never more than that airline's fares on the trip. Remove this block when the credit is used up.
+  airline: "Southwest"
+  amount_usd: 100
+
 price_alerts:
   min_drop_pct: 5.0
 

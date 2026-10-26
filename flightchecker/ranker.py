@@ -117,3 +117,20 @@ def combine_legs(
             ))
     pairings.sort(key=lambda p: p.combined_score)
     return pairings[:top_n]
+
+
+def is_coupon_airline(r: FlightResult, coupon: Optional[dict]) -> bool:
+    """True when the leg is flown by the airline the coupon is for (settings.coupon.airline)."""
+    return bool(coupon) and coupon["airline"].lower() in (r.airline_text or "").lower()
+
+
+def coupon_discount(out: FlightResult, ret: FlightResult, coupon: Optional[dict]) -> float:
+    """Dollars off a trip from a single-use airline credit.
+
+    Applied once per trip (both legs on that airline are booked together), and never more
+    than the fares of the legs flown by that airline.
+    """
+    if not coupon:
+        return 0.0
+    eligible = sum(r.price_usd for r in (out, ret) if is_coupon_airline(r, coupon))
+    return min(float(coupon["amount_usd"]), eligible)

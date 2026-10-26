@@ -5,9 +5,11 @@
 {% set ns = namespace(all=[]) %}{% for rr in route_results %}{% if rr.route.date_pairs %}{% set ns.all = ns.all + rr.best_pairings %}{% endif %}{% endfor %}
 {% if ns.all %}
 ## Cheapest trips overall (all airports)
-| # | Route | Dates (out → return) | Total | Outbound leg | Return leg | Links |
-|---|-------|----------------------|-------|--------------|------------|-------|
-{% for p in (ns.all | sort(attribute="total_price_usd"))[:15] %}| {{ loop.index }} | {{ p.outbound.origin }} → {{ p.outbound.destination }} | {{ p.outbound.depart_date }} → {{ p.ret.depart_date }} | **${{ "%.0f"|format(p.total_price_usd) }}** | {{ p.outbound.airline_text or "—" }} ${{ "%.0f"|format(p.outbound.price_usd) }} · {{ p.outbound.duration_text }} · {{ p.outbound.stops_text }} | {{ p.ret.airline_text or "—" }} ${{ "%.0f"|format(p.ret.price_usd) }} · {{ p.ret.duration_text }} · {{ p.ret.stops_text }} | [Out]({{ p.outbound.search_url }}) · [Ret]({{ p.ret.search_url }}) |
+{% if settings.coupon %}_Ranked by what you pay after the ${{ settings.coupon.amount_usd }} {{ settings.coupon.airline }} credit (applied once per trip)._
+{% endif %}
+| # | Route | Dates (out → return) | You pay | Fare | Outbound leg | Return leg | Links |
+|---|-------|----------------------|---------|------|--------------|------------|-------|
+{% for p in (ns.all | sort(attribute="cost_usd"))[:15] %}| {{ loop.index }} | {{ p.outbound.origin }} → {{ p.outbound.destination }} | {{ p.outbound.depart_date }} → {{ p.ret.depart_date }} | **${{ "%.0f"|format(p.cost_usd) }}** | ${{ "%.0f"|format(p.total_price_usd) }} | {{ p.outbound.airline_text or "—" }} ${{ "%.0f"|format(p.outbound.price_usd) }} · {{ p.outbound.duration_text }} · {{ p.outbound.stops_text }} | {{ p.ret.airline_text or "—" }} ${{ "%.0f"|format(p.ret.price_usd) }} · {{ p.ret.duration_text }} · {{ p.ret.stops_text }} | [Out]({{ p.outbound.search_url }}) · [Ret]({{ p.ret.search_url }}) |
 {% endfor %}
 ---
 {% endif %}
@@ -65,9 +67,9 @@ _No return results found._
 {% if rr.route.date_pairs %}
 {% if rr.best_pairings %}
 ### Trips, cheapest first (both legs checked: stops and duration; top 15 of {{ rr.best_pairings | length }})
-| # | Dates (out → return) | Total | Outbound leg | Return leg | Links |
-|---|----------------------|-------|--------------|------------|-------|
-{% for p in rr.best_pairings[:15] %}| {{ loop.index }} | {{ p.outbound.depart_date }} → {{ p.ret.depart_date }} | **${{ "%.0f"|format(p.total_price_usd) }}** | {{ p.outbound.airline_text or "—" }} ${{ "%.0f"|format(p.outbound.price_usd) }} · {{ p.outbound.duration_text }} · {{ p.outbound.stops_text }} | {{ p.ret.airline_text or "—" }} ${{ "%.0f"|format(p.ret.price_usd) }} · {{ p.ret.duration_text }} · {{ p.ret.stops_text }} | [Out]({{ p.outbound.search_url }}) · [Ret]({{ p.ret.search_url }}) |
+| # | Dates (out → return) | You pay | Fare | Outbound leg | Return leg | Links |
+|---|----------------------|---------|------|--------------|------------|-------|
+{% for p in rr.best_pairings[:15] %}| {{ loop.index }} | {{ p.outbound.depart_date }} → {{ p.ret.depart_date }} | **${{ "%.0f"|format(p.cost_usd) }}** | ${{ "%.0f"|format(p.total_price_usd) }} | {{ p.outbound.airline_text or "—" }} ${{ "%.0f"|format(p.outbound.price_usd) }} · {{ p.outbound.duration_text }} · {{ p.outbound.stops_text }} | {{ p.ret.airline_text or "—" }} ${{ "%.0f"|format(p.ret.price_usd) }} · {{ p.ret.duration_text }} · {{ p.ret.stops_text }} | [Out]({{ p.outbound.search_url }}) · [Ret]({{ p.ret.search_url }}) |
 {% endfor %}
 {% else %}
 _No date pair has a qualifying outbound and return leg._
