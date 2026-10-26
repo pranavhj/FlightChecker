@@ -4,7 +4,7 @@ from pathlib import Path
 import pytest
 import yaml
 
-from flightchecker.config_loader import load_routes, date_range
+from flightchecker.config_loader import load_routes, date_range, stay_date_pairs
 
 
 def write_yaml(tmp_path: Path, filename: str, data: dict) -> Path:
@@ -72,3 +72,27 @@ def test_date_range_inclusive():
 def test_date_range_single_day():
     window = {"start": "2026-05-01", "end": "2026-05-01"}
     assert date_range(window) == ["2026-05-01"]
+
+
+def test_stay_pairs_cover_every_stay_length_from_each_departure_day():
+    spec = {"start": "2099-03-01", "end": "2099-03-06", "min_days": 3, "max_days": 4}
+    assert stay_date_pairs(spec) == [
+        ("2099-03-01", "2099-03-04"), ("2099-03-01", "2099-03-05"),
+        ("2099-03-02", "2099-03-05"), ("2099-03-02", "2099-03-06"),
+        ("2099-03-03", "2099-03-06"),
+    ]
+
+
+def test_stay_pairs_empty_when_window_shorter_than_min_stay():
+    spec = {"start": "2099-03-01", "end": "2099-03-02", "min_days": 3, "max_days": 7}
+    assert stay_date_pairs(spec) == []
+
+
+def test_trips_route_becomes_round_trip_with_date_pairs(tmp_path):
+    data = {"routes": [{
+        "origins": ["SJC"], "destinations": ["IAD"],
+        "trips": {"start": "2099-03-01", "end": "2099-03-05", "min_days": 3, "max_days": 7},
+    }]}
+    routes, _ = load_routes(write_yaml(tmp_path, "routes.yaml", data))
+    assert routes[0].date_pairs == [("2099-03-01", "2099-03-04"), ("2099-03-01", "2099-03-05"),
+                                    ("2099-03-02", "2099-03-05")]

@@ -34,6 +34,26 @@ def weekend_date_pairs(spec: dict) -> list[tuple[str, str]]:
     return sorted(pairs)
 
 
+def stay_date_pairs(spec: dict) -> list[tuple[str, str]]:
+    """Expand a trips spec into (outbound, return) ISO date pairs for any departure day.
+
+    spec: {start, end, min_days, max_days}. The return is min_days..max_days after the
+    outbound; pairs before today or returning after `end` are dropped.
+    """
+    from datetime import date, timedelta
+    start = max(date.fromisoformat(str(spec["start"])), date.today())
+    end = date.fromisoformat(str(spec["end"]))
+    pairs: list[tuple[str, str]] = []
+    day = start
+    while day + timedelta(days=spec["min_days"]) <= end:
+        for stay in range(spec["min_days"], spec["max_days"] + 1):
+            ret = day + timedelta(days=stay)
+            if ret <= end:
+                pairs.append((day.isoformat(), ret.isoformat()))
+        day += timedelta(days=1)
+    return pairs
+
+
 def load_routes(path: Path) -> tuple[list[RouteConfig], int]:
     data = load_yaml(path)
     top_n = data.get("top_n_results", 3)
@@ -41,7 +61,12 @@ def load_routes(path: Path) -> tuple[list[RouteConfig], int]:
     for r in data.get("routes", []):
         origins = r.get("origins") or [r["origin"]]
         destinations = r.get("destinations") or [r["destination"]]
-        pairs = weekend_date_pairs(r["weekend_trips"]) if r.get("weekend_trips") else []
+        if r.get("weekend_trips"):
+            pairs = weekend_date_pairs(r["weekend_trips"])
+        elif r.get("trips"):
+            pairs = stay_date_pairs(r["trips"])
+        else:
+            pairs = []
         one_way = False if pairs else r.get("one_way", True)
         return_window = None
         outbound_window = r.get("outbound_window") or r.get("date_window")
