@@ -1,0 +1,107 @@
+"""Compact Discord summary for date-pair trips: one monospace table, then one line of links.
+
+Discord does not render Markdown tables, so the table goes in a code block; links can't be
+clicked inside a code block, so they follow as short masked links ([1 out](<url>) ...).
+"""
+from __future__ import annotations
+
+import re
+from datetime import date
+
+DISCORD_LIMIT = 2000
+
+_AIRLINE_CODES = {
+    "alaska": "AS", "american": "AA", "breeze": "MX", "delta": "DL", "frontier": "F9",
+    "hawaiian": "HA", "jetblue": "B6", "southwest": "WN", "spirit": "NK", "sun country": "SY",
+    "united": "UA",
+}
+
+
+def airline_code(text: str) -> str:
+    """'Southwest' -> 'WN', 'Alaska, American' -> 'AS+AA', unknown -> first 6 chars."""
+    if not text:
+        return "?"
+    codes = []
+    for name in re.split(r",|·|\band\b", text):
+        name = name.strip().lower()
+        if name:
+            codes.append(next((c for k, c in _AIRLINE_CODES.items() if name.startswith(k)), name[:6].title()))
+    return "+".join(codes)
+
+
+def short_time(text: str) -> str:
+    """First clock time in scraped text: '11:15 PM\\n–\\n9:35 AM' -> '11:15p'."""
+    m = re.search(r"(\d{1,2}:\d{2})\s*([AP])M", text or "", re.I)
+    return f"{m.group(1)}{m.group(2).lower()}" if m else "?"
+
+
+def short_duration(text: str) -> str:
+    """'7 hr 15 min' -> '7h15', '8 hr' -> '8h00'."""
+    m = re.search(r"(\d+)\s*h(?:r|our)?s?(?:\s*(\d+)\s*m)?", text or "", re.I)
+    return f"{m.group(1)}h{int(m.group(2) or 0):02d}" if m else "?"
+
+
+def short_stops(text: str) -> str:
+    """'Nonstop' -> '0s', '1 stop' -> '1s'."""
+    if "nonstop" in (text or "").lower():
+        return "0s"
+    m = re.search(r"(\d+)\s*stop", text or "", re.I)
+    return f"{m.group(1)}s" if m else "?"
+
+
+def short_dates(out_iso: str, ret_iso: str) -> str:
+    """'2026-12-02','2026-12-05' -> 'Dec 2-5'; across months -> 'Nov 28-Dec 3'."""
+    out, ret = date.fromisoformat(out_iso), date.fromisoformat(ret_iso)
+    if out.month == ret.month:
+        return f"{out:%b} {out.day}-{ret.day}"
+    return f"{out:%b} {out.day}-{ret:%b} {ret.day}"
+
+
+def _leg(r) -> str:
+    return f"{airline_code(r.airline_text):<5} {short_time(r.dep_time_text):>6} {short_duration(r.duration_text)} {short_stops(r.stops_text)}"
+
+
+def pick_trips(pairings: list, max_rows: int = 8, per_route: int = 2) -> list:
+    """Cheapest trips overall, at most `per_route` per origin->destination so one route can't fill the table."""
+    picked, count = [], {}
+    for p in sorted(pairings, key=lambda p: p.total_price_usd):
+        key = (p.outbound.origin, p.outbound.destination)
+        if count.get(key, 0) < per_route:
+            picked.append(p)
+            count[key] = count.get(key, 0) + 1
+        if len(picked) == max_rows:
+            break
+    return picked
+
+
+def format_trip_messages(pairings: list, run_time: str) -> list[str]:
+    """Discord messages (each <= 2000 chars): header + table, then links (8 rows of links fit one message)."""
+    trips = pick_trips(pairings)
+    if not trips:
+        return [f"**FlightChecker** ({run_time} UTC): no trip passed the filters."]
+    header = f"{'#':<2} {'Total':<5} {'Route':<7} {'Dates':<12} {'Days':>4}  {'Out':<20}  Back"
+    rows = []
+    for i, p in enumerate(trips, 1):
+        out, ret = p.outbound, p.ret
+        days = (date.fromisoformat(ret.depart_date) - date.fromisoformat(out.depart_date)).days
+        rows.append(f"{i:<2} {f'${p.total_price_usd:.0f}':<5} {out.origin}-{out.destination} "
+                    f"{short_dates(out.depart_date, ret.depart_date):<12} {days:>3}d  {_leg(out)}  {_leg(ret)}")
+    table = (f"**FlightChecker** ({run_time} UTC): cheapest trips, both legs max 1 stop and under 8.5 h\n"
+             "```\n" + "\n".join([header, *rows]) + "\n```\n"
+             "-# Out/Back = airline, departs, duration, stops (0s = nonstop)")
+    links = [f"{i} [out](<{p.outbound.search_url}>) · [back](<{p.ret.search_url}>)" for i, p in enumerate(trips, 1)]
+    return [table, *_chunk(links, "\n")]
+
+
+def _chunk(parts: list[str], sep: str) -> list[str]:
+    """Join parts with sep into as few messages as fit under the Discord limit."""
+    messages, current = [], ""
+    for part in parts:
+        candidate = f"{current}{sep}{part}" if current else part
+        if len(candidate) > DISCORD_LIMIT:
+            messages.append(current)
+            candidate = part
+        current = candidate
+    if current:
+        messages.append(current)
+    return messages

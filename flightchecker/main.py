@@ -11,6 +11,8 @@ from pathlib import Path
 import schedule
 import time as _time
 
+from flightchecker.discord_summary import format_trip_messages
+
 logger = logging.getLogger(__name__)
 
 
@@ -63,19 +65,17 @@ def _post_to_discord(report_path: Path, route_results: list, run_time: str, sett
         except Exception as e:
             logger.warning("Failed to post to Discord: %s", e)
 
-    send_msg(f"**FlightChecker Update** ({run_time} UTC)")
+    # Date-pair trips: one compact table + a line of links (see discord_summary)
+    if any(rr.route.date_pairs for rr in route_results):
+        trip_pairs = [p for rr in route_results if rr.route.date_pairs for p in rr.best_pairings]
+        for msg in format_trip_messages(trip_pairs, run_time):
+            send_msg(msg)
 
-    all_pairs = sorted((p for rr in route_results if rr.route.date_pairs for p in rr.best_pairings),
-                       key=lambda p: p.total_price_usd)[:5]
-    if all_pairs:
-        lines = ["**Cheapest trips overall** (both legs: max 1 stop, under 8.5 h)"]
-        for p in all_pairs:
-            out, ret = p.outbound, p.ret
-            lines.append(f"• **{fmt_price(p.total_price_usd)}** {out.origin}→{out.destination} "
-                         f"{out.depart_date} → {ret.depart_date} — {out.airline_text or '?'} / {ret.airline_text or '?'}")
-        send_msg("\n".join(lines))
+    legacy = [rr for rr in route_results if not rr.route.date_pairs]
+    if legacy:
+        send_msg(f"**FlightChecker Update** ({run_time} UTC)")
 
-    for rr in route_results:
+    for rr in legacy:
         origin, dest = rr.route.origin, rr.route.destination
 
         per_leg = not rr.route.date_pairs  # weekend routes: the combos block already shows both legs
