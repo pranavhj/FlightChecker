@@ -37,17 +37,19 @@ def weekend_date_pairs(spec: dict) -> list[tuple[str, str]]:
 def stay_date_pairs(spec: dict) -> list[tuple[str, str]]:
     """Expand a trips spec into (outbound, return) ISO date pairs for any departure day.
 
-    spec: {start, end, min_days, max_days, exclude_dates?}. The return is min_days..max_days
-    after the outbound; pairs before today or returning after `end` are dropped, and so are
-    trips that are away on an exclude_dates day (outbound <= day < return; flying home that day is fine).
+    spec: {start, end, min_days, max_days, last_outbound?, exclude_dates?}. The return is
+    min_days..max_days after the outbound; pairs before today or returning after `end` are
+    dropped, as are outbound dates after `last_outbound` and trips that are away on an
+    exclude_dates day (outbound <= day < return; flying home that day is fine).
     """
     from datetime import date, timedelta
     start = max(date.fromisoformat(str(spec["start"])), date.today())
     end = date.fromisoformat(str(spec["end"]))
+    last_outbound = date.fromisoformat(str(spec["last_outbound"])) if spec.get("last_outbound") else end
     excluded = [date.fromisoformat(str(d)) for d in spec.get("exclude_dates", [])]
     pairs: list[tuple[str, str]] = []
     day = start
-    while day + timedelta(days=spec["min_days"]) <= end:
+    while day <= last_outbound and day + timedelta(days=spec["min_days"]) <= end:
         for stay in range(spec["min_days"], spec["max_days"] + 1):
             ret = day + timedelta(days=stay)
             if ret <= end and not any(day <= d < ret for d in excluded):

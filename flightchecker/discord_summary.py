@@ -14,6 +14,12 @@ _AIRLINE_CODES = {
     "alaska": "AS", "american": "AA", "breeze": "MX", "delta": "DL", "frontier": "F9",
     "hawaiian": "HA", "jetblue": "B6", "southwest": "WN", "spirit": "NK", "sun country": "SY",
     "united": "UA",
+    # long-haul (Mumbai <-> SF searches)
+    "air france": "AF", "air india": "AI", "all nippon": "NH", "ana": "NH", "asiana": "OZ",
+    "british": "BA", "cathay": "CX", "china airlines": "CI", "emirates": "EK", "etihad": "EY",
+    "eva": "BR", "finnair": "AY", "indigo": "6E", "japan": "JL", "klm": "KL", "korean": "KE",
+    "lufthansa": "LH", "qatar": "QR", "singapore": "SQ", "swiss": "LX", "thai": "TG",
+    "turkish": "TK", "virgin atlantic": "VS", "vistara": "UK",
 }
 
 
@@ -61,8 +67,14 @@ def _leg(r) -> str:
     return f"{airline_code(r.airline_text):<5} {short_time(r.dep_time_text):>6} {short_duration(r.duration_text)} {short_stops(r.stops_text)}"
 
 
-def pick_trips(pairings: list, max_rows: int = 8, per_route: int = 2) -> list:
-    """Cheapest trips overall, at most `per_route` per origin->destination so one route can't fill the table."""
+def pick_trips(pairings: list, max_rows: int = 8, per_route: int | None = None) -> list:
+    """Cheapest trips overall, at most `per_route` per origin->destination so one route can't fill the table.
+
+    Default per_route splits the rows evenly over the routes present (min 2): one route gets all 8 rows.
+    """
+    if per_route is None:
+        routes = {(p.outbound.origin, p.outbound.destination) for p in pairings}
+        per_route = max(2, -(-max_rows // max(len(routes), 1)))
     picked, count = [], {}
     for p in sorted(pairings, key=lambda p: (_cost(p), p.total_price_usd)):
         key = (p.outbound.origin, p.outbound.destination)
@@ -79,7 +91,20 @@ def _cost(p) -> float:
     return p.cost_usd if p.cost_usd is not None else p.total_price_usd
 
 
-def format_trip_messages(pairings: list, run_time: str, coupon: dict | None = None) -> list[str]:
+def limits_text(routes: list) -> str:
+    """'both legs max 1 stop and under 26 h' from the routes' max_stops / max_duration_hours."""
+    stops = [r.max_stops for r in routes if r.max_stops is not None]
+    hours = [r.max_duration_hours for r in routes if r.max_duration_hours is not None]
+    parts = []
+    if stops:
+        parts.append(f"max {max(stops)} stop" + ("" if max(stops) == 1 else "s"))
+    if hours:
+        parts.append(f"under {round(max(hours) * 2) / 2:g} h")
+    return "both legs " + " and ".join(parts) if parts else "both legs checked"
+
+
+def format_trip_messages(pairings: list, run_time: str, coupon: dict | None = None,
+                         limits: str = "both legs max 1 stop and under 8.5 h") -> list[str]:
     """Discord messages (each <= 2000 chars): header + table, then links (8 rows of links fit one message)."""
     trips = pick_trips(pairings)
     if not trips:
@@ -93,7 +118,7 @@ def format_trip_messages(pairings: list, run_time: str, coupon: dict | None = No
                     f"{short_dates(out.depart_date, ret.depart_date):<12} {days:>3}d  {_leg(out)}  {_leg(ret)}")
     credit = (f"Pay = fare minus your ${coupon['amount_usd']} {coupon['airline']} credit (once per trip); "
               if coupon else "")
-    table = (f"**FlightChecker** ({run_time} UTC): cheapest trips, both legs max 1 stop and under 8.5 h\n"
+    table = (f"**FlightChecker** ({run_time} UTC): cheapest trips, {limits}\n"
              "```\n" + "\n".join([header, *rows]) + "\n```\n"
              f"-# {credit}Out/Back = airline, departs, duration, stops (0s = nonstop)")
     links = [f"{i} [out](<{p.outbound.search_url}>) · [back](<{p.ret.search_url}>)" for i, p in enumerate(trips, 1)]

@@ -94,6 +94,12 @@ def test_excluded_date_drops_trips_away_that_day_but_keeps_flying_home_on_it():
     assert stay_date_pairs(spec) == [("2099-03-01", "2099-03-05")]
 
 
+def test_last_outbound_stops_departures_but_returns_may_run_past_it():
+    spec = {"start": "2099-03-01", "end": "2099-03-20", "min_days": 10, "max_days": 10,
+            "last_outbound": "2099-03-02"}
+    assert stay_date_pairs(spec) == [("2099-03-01", "2099-03-11"), ("2099-03-02", "2099-03-12")]
+
+
 def test_trips_route_becomes_round_trip_with_date_pairs(tmp_path):
     data = {"routes": [{
         "origins": ["SJC"], "destinations": ["IAD"],

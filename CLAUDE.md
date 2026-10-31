@@ -30,12 +30,15 @@ The service is a oneshot: never `restart` it mid-run unless you mean to abort th
 
 ## Routes configured
 
-`config/routes.yaml`: SFO and SJC → IAD, DCA, BWI. `trips:` = every departure day from today to
-2026-12-31, return 4-7 days later, never in DC on Dec 2 (`exclude_dates`). Each leg is searched one-way and filtered on its own (max 1 stop,
-under 8 h 30 min), then paired by date and ranked by what you pay: `settings.coupon` (a $100
-Southwest credit, applied once per trip, capped at the Southwest fares) comes off first, so per date
-the cheapest leg AND the cheapest Southwest leg are kept. Delete `coupon:` when the credit is used. Also supported: `weekend_trips:`
-(weekday patterns) and plain `outbound_window`/`return_window`.
+`config/routes.yaml` (since 2026-10-31): Mum's trip, **BOM → SFO** and back. `trips:` = every
+departure day 2026-11-01 … `last_outbound` 2027-01-31, return 20-35 days later (`end` = latest
+return). Each leg is searched one-way and filtered on its own (max 1 stop, under 26 h), then
+paired by date and ranked by price. The earlier SFO/SJC → DC search (4-7 day trips, Southwest
+credit) was removed when those tickets were booked; see git history for the config.
+
+Other supported spec keys: `exclude_dates:` (drop trips that are away on a date), `weekend_trips:`
+(weekday patterns), plain `outbound_window`/`return_window`, and `settings.coupon` (a single-use
+airline credit applied once per trip; commented out in `config/settings.yaml` now).
 
 ## Changing the code: clone → change → push (Pi + GitHub) → test → delete
 

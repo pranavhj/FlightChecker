@@ -1,16 +1,17 @@
 routes:
-  # Home (SFO, SJC) -> Washington DC area, trips of 4 to 7 days leaving any day
-  # from today through the end of 2026. Cheapest wins.
-  # Each leg (out and back) is searched and filtered separately: max 1 stop, under 8.5 h.
-  - origins: [SFO, SJC]
-    destinations: [IAD, DCA, BWI]
+  # Mum: Mumbai (BOM) -> San Francisco (SFO), stays of 20 to 35 days, leaving any day in the next
+  # 3 months. The DC trips were booked on 2026-10-31 and removed from this list.
+  # Each leg (BOM->SFO out, SFO->BOM back) is searched and filtered separately:
+  # max 1 stop, under 26 h. Cheapest wins; the report also shows price + 15 USD/hour (best value).
+  - origins: [BOM]
+    destinations: [SFO]
     trips:
-      start: "2026-10-27"
-      end: "2026-12-31"
-      min_days: 4   # return 4..7 days after the outbound date (more than 3 days there)
-      max_days: 7
-      exclude_dates: ["2026-12-02"]   # friend away: no trip that is in DC on Dec 2 (flying home that day is OK)
+      start: "2026-11-01"
+      last_outbound: "2027-01-31"   # last day she can leave Mumbai
+      end: "2027-03-07"             # latest return = last_outbound + 35 days
+      min_days: 20
+      max_days: 35
     max_stops: 1
-    max_duration_hours: 8.49   # strictly under 8 h 30 min, per leg
+    max_duration_hours: 25.99   # strictly under 26 h, per leg
 
 top_n_results: 5
