@@ -2,8 +2,9 @@
 
 ## State
 Currently: Runs on the Raspberry Pi (pi5:flightchecker, systemd timer 07:00 PT daily, posts to Discord #reminders). PC folder holds only a pointer CLAUDE.md.
-Search: SFO/SJC -> IAD/DCA/BWI, trips of 3-7 days leaving any day through 2026-12-31 (`trips:` spec). Each leg searched one-way and filtered separately (max 1 stop, under 8.5 h), paired by date, ranked by total.
-Last session: 2026-10-26
+Search (since 2026-10-31): Mum's trip BOM <-> SFO, leaving Nov 1 - Jan 31, stay 20-35 days (`trips:` spec). Each leg searched one-way and filtered separately (max 1 stop, under 26 h), paired by date; report and Discord show cheapest AND best value (price + $15/h). The DC search was removed when those tickets were booked; the Southwest credit is commented out in settings.yaml.
+Next: after Mum books, replace routes.yaml with the next trip (or stop the timer: `ssh pi5 sudo systemctl disable --now flightchecker.timer`).
+Last session: 2026-10-31
 
 ## Done
 - Fixed Discord update: dep_time newlines cleaned (was "11:15 PM\n–\n9:35 AM"), best_pairings now shows times/duration/stops/baggage per leg
