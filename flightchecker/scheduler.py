@@ -251,10 +251,10 @@ class DailyRunner:
                     route.max_stops, route.max_duration_hours)
 
         coupon = self.settings.get("coupon")
-        best_out = await self._cheapest_leg_per_date(scraper, route, out_dates, "outbound", warnings, coupon)
-        best_ret = await self._cheapest_leg_per_date(scraper, route, ret_dates, "return", warnings, coupon)
+        best_out = await self._cheapest_leg_per_date(scraper, route, out_dates, "outbound", warnings, coupon, time_weight)
+        best_ret = await self._cheapest_leg_per_date(scraper, route, ret_dates, "return", warnings, coupon, time_weight)
 
-        pairings = []
+        pairings, value_pairings = [], []
         for out_date, ret_date in route.date_pairs:
             outs, rets = best_out.get(out_date, []), best_ret.get(ret_date, [])
             if not outs or not rets:
@@ -269,25 +269,29 @@ class DailyRunner:
                     discount = coupon_discount(out, ret, coupon)
                     options.append(LegPairing(
                         outbound=out, ret=ret, total_price_usd=total,
-                        combined_score=round(total + time_weight * (out.total_hours + ret.total_hours), 2),
+                        combined_score=round(total - discount + time_weight * (out.total_hours + ret.total_hours), 2),
                         coupon_usd=discount, cost_usd=total - discount,
                     ))
             pairings.append(min(options, key=lambda p: (p.cost_usd, p.combined_score)))
+            value_pairings.append(min(options, key=lambda p: (p.combined_score, p.cost_usd)))
         pairings.sort(key=lambda p: (p.cost_usd, p.combined_score))
+        value_pairings.sort(key=lambda p: (p.combined_score, p.cost_usd))
         logger.info("%s->%s: %d of %d date pairs have a qualifying trip", route.origin, route.destination,
                     len(pairings), len(route.date_pairs))
         return RouteRunResult(
             route=route, source=source_name,
             outbound_results=sorted((r for legs in best_out.values() for r in legs), key=lambda r: r.price_usd),
             return_results=sorted((r for legs in best_ret.values() for r in legs), key=lambda r: r.price_usd),
-            best_pairings=pairings, warnings=warnings,
+            best_pairings=pairings, value_pairings=value_pairings, warnings=warnings,
         )
 
-    async def _cheapest_leg_per_date(self, scraper, route, dates, leg, warnings, coupon: dict | None = None) -> dict:
-        """One-way search per date; return {date: [cheapest qualifying leg, cheapest qualifying coupon-airline leg]}.
+    async def _cheapest_leg_per_date(self, scraper, route, dates, leg, warnings, coupon: dict | None = None,
+                                     time_weight: float = 15.0) -> dict:
+        """One-way search per date; return {date: [cheapest qualifying leg, best-value leg, cheapest coupon-airline leg]}.
 
-        The coupon-airline leg is kept even when dearer (the credit can make the trip cheaper);
-        the list has one entry when that leg is also the cheapest or there is none.
+        Best value = lowest price + time_weight * hours. It and the coupon-airline leg are kept even
+        when dearer (a shorter flight, or the credit, can make the trip the better deal); entries
+        that coincide with an earlier one are left out, so the list has 1-3 legs.
         Legs whose price, stops or duration can't be read are rejected, not passed through.
         """
         best = {}
@@ -314,8 +318,12 @@ class DailyRunner:
             if ok:
                 cheapest = min(ok, key=lambda r: r.price_usd)
                 best[d] = [cheapest]
+                # Best value = price + time_weight * hours: may be dearer than the cheapest but much shorter
+                value = min(ok, key=lambda r: r.price_usd + time_weight * r.total_hours)
+                if value is not cheapest:
+                    best[d].append(value)
                 coupon_legs = [r for r in ok if is_coupon_airline(r, coupon)]
-                if coupon_legs and not is_coupon_airline(cheapest, coupon):
+                if coupon_legs and not any(is_coupon_airline(r, coupon) for r in best[d]):
                     best[d].append(min(coupon_legs, key=lambda r: r.price_usd))
         return best
 

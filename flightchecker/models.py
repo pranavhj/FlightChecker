@@ -60,5 +60,6 @@ class RouteRunResult:
     outbound_results: list = field(default_factory=list)   # list[FlightResult]
     return_results: list = field(default_factory=list)     # list[FlightResult] or []
     best_pairings: list = field(default_factory=list)      # list[LegPairing] for return routes
+    value_pairings: list = field(default_factory=list)     # date-pair routes: per date pair, best price + time cost
     roundtrip_results: list = field(default_factory=list)  # list[FlightResult] with leg="roundtrip"
     warnings: list = field(default_factory=list)           # list[str]

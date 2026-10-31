@@ -71,6 +71,12 @@ _No return results found._
 |---|----------------------|---------|------|--------------|------------|-------|
 {% for p in rr.best_pairings[:15] %}| {{ loop.index }} | {{ p.outbound.depart_date }} → {{ p.ret.depart_date }} | **${{ "%.0f"|format(p.cost_usd) }}** | ${{ "%.0f"|format(p.total_price_usd) }} | {{ p.outbound.airline_text or "—" }} ${{ "%.0f"|format(p.outbound.price_usd) }} · {{ p.outbound.duration_text }} · {{ p.outbound.stops_text }} | {{ p.ret.airline_text or "—" }} ${{ "%.0f"|format(p.ret.price_usd) }} · {{ p.ret.duration_text }} · {{ p.ret.stops_text }} | [Out]({{ p.outbound.search_url }}) · [Ret]({{ p.ret.search_url }}) |
 {% endfor %}
+
+### Best value (price + ${{ "%.0f"|format(time_weight) }} per hour of flying; top 10 of {{ rr.value_pairings | length }})
+| # | Dates (out → return) | You pay | Hours (out + back) | Score | Outbound leg | Return leg | Links |
+|---|----------------------|---------|--------------------|-------|--------------|------------|-------|
+{% for p in rr.value_pairings[:10] %}| {{ loop.index }} | {{ p.outbound.depart_date }} → {{ p.ret.depart_date }} | **${{ "%.0f"|format(p.cost_usd) }}** | {{ "%.1f"|format(p.outbound.total_hours + p.ret.total_hours) }} | {{ "%.0f"|format(p.combined_score) }} | {{ p.outbound.airline_text or "—" }} ${{ "%.0f"|format(p.outbound.price_usd) }} · {{ p.outbound.duration_text }} · {{ p.outbound.stops_text }} | {{ p.ret.airline_text or "—" }} ${{ "%.0f"|format(p.ret.price_usd) }} · {{ p.ret.duration_text }} · {{ p.ret.stops_text }} | [Out]({{ p.outbound.search_url }}) · [Ret]({{ p.ret.search_url }}) |
+{% endfor %}
 {% else %}
 _No date pair has a qualifying outbound and return leg._
 {% endif %}

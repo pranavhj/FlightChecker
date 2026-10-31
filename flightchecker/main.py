@@ -69,7 +69,10 @@ def _post_to_discord(report_path: Path, route_results: list, run_time: str, sett
     if any(rr.route.date_pairs for rr in route_results):
         trip_pairs = [p for rr in route_results if rr.route.date_pairs for p in rr.best_pairings]
         trip_routes = [rr.route for rr in route_results if rr.route.date_pairs]
-        for msg in format_trip_messages(trip_pairs, run_time, settings.get("coupon"), limits_text(trip_routes)):
+        value_pairs = [p for rr in route_results if rr.route.date_pairs for p in rr.value_pairings]
+        time_weight = settings.get("scoring", {}).get("time_weight_usd_per_hour", 15.0)
+        for msg in format_trip_messages(trip_pairs, run_time, settings.get("coupon"), limits_text(trip_routes),
+                                        value_pairs, time_weight):
             send_msg(msg)
 
     legacy = [rr for rr in route_results if not rr.route.date_pairs]
